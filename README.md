@@ -58,22 +58,19 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
      CREATE EXTENSION hive2_fdw;
  
      CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw 
-       OPTIONS(url 'jdbc:cassandra://localhost:9160/example');
-
+     OPTIONS(url 'jdbc:hive2://localhost:10000/default');
 
 10) Create a user mapping for the server.
 
       CREATE USER MAPPING FOR public SERVER hive_serv OPTIONS(username 'test', password 'test');
 
-
 11) Create a foreign table on the server.
 
-      CREATE FOREIGN TABLE oo (id int) SERVER hive_serv OPTIONS (table 'example.oorder');
-
+      CREATE FOREIGN TABLE test1 (id int) SERVER hive_serv OPTIONS (query 'SELECT * FROM test2');
 
 12) Query the foreign table.
 
-      SELECT * FROM oo limit 5;
+      SELECT * FROM test1 limit 5;
 
 The output should be :
 
