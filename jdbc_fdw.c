@@ -285,7 +285,10 @@ JVMInitialization(Oid foreigntableid)
 	char 		*maxheapsizeoption = NULL;
 	int 		svr_querytimeout = 0;
 	int 		svr_maxheapsize = 0;
-
+    	char            *var_CP = NULL;
+        char            *var_PGHOME = NULL;
+        int             cp_len = 0;
+	
 	jdbcGetOptions(
 	    foreigntableid, 
 	    &svr_drivername, 
@@ -303,8 +306,15 @@ JVMInitialization(Oid foreigntableid)
 
 	if (FunctionCallCheck == false)
 	{
-		classpath = (char*)palloc(strlen(strpkglibdir) + 19);
-		snprintf(classpath, strlen(strpkglibdir) + 19, "-Djava.class.path=%s", strpkglibdir);
+
+	        var_CP = getenv("HIVE_JDBC_CLASSPATH");
+                elog(LOG, "JDBC_FDW: var_CP=%s", var_CP);
+                var_PGHOME = getenv("PGHOME");
+                elog(LOG, "JDBC_FDW: var_PGHOME=%s", var_PGHOME);
+
+                cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
+                classpath = (char*)palloc(cp_len);
+                snprintf(classpath, cp_len, "-Djava.class.path=%s/lib:%s", var_PGHOME, var_CP);
 
 		if (svr_maxheapsize != 0)   /* If the user has given a value for setting the max heap size of the JVM */
 		{
@@ -1057,7 +1067,7 @@ jdbcGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 	SIGINTInterruptCheckProcess();
 
 	/* Create a ForeignPath node and add it as only possible path */
-	add_path(baserel, (Path*)create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL)); 
+	add_path(baserel, (Path*)create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL,NULL)); 
 }
 
 /*
@@ -1076,7 +1086,7 @@ jdbcGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, F
 	scan_clauses = extract_actual_clauses(scan_clauses, false);
 
 	/* Create the ForeignScan node */
-	return (make_foreignscan(tlist, scan_clauses, scan_relid, NIL, NIL)); 
+	return (make_foreignscan(tlist, scan_clauses, scan_relid, NIL, NIL,NULL,NULL,NULL)); 
 }
 
 /*
