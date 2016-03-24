@@ -57,7 +57,7 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
      CREATE EXTENSION hive2_fdw;
  
      CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw 
-     OPTIONS(url 'jdbc:hive2://localhost:10000/default');
+     OPTIONS(drivername 'org.apache.hive.jdbc.HiveDriver',url 'jdbc:hive2://localhost:10000/default',querytimeout '15',jarfile '/home/braj/hive/lib/hive-jdbc-1.2.1-standalone.jar');
 
 10) Create a user mapping for the server.
 
