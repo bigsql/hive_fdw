@@ -1,6 +1,6 @@
 ##########################################################################
 #
-#                foreign-data wrapper for JDBC
+#                foreign-data wrapper for HIVE
 #
 # Copyright (c) 2012, PostgreSQL Global Development Group
 #
@@ -9,19 +9,19 @@
 # Author:Atri Sharma <atri.jiit@gmail.com>
 #
 # IDENTIFICATION
-#                 jdbc_fdw/Makefile
+#                 hive_fdw/Makefile
 # 
 ##########################################################################
 
-MODULE_big = jdbc_fdw
-OBJS = jdbc_fdw.o
+MODULE_big = hive_fdw
+OBJS = hive_fdw.o
 
-EXTENSION = jdbc_fdw
-DATA = jdbc_fdw--1.0.sql
+EXTENSION = hive_fdw
+DATA = hive_fdw--1.0.sql
 
-REGRESS = jdbc_fdw
+REGRESS = hive_fdw
 
-JDBC_CONFIG = jdbc_config
+HIVE_CONFIG = hive_config
 
 SHLIB_LINK = -ljvm
 
@@ -34,8 +34,8 @@ endif
 TRGTS = JAVAFILES
 
 JAVA_SOURCES = \
-        JDBCUtils.java \
-	JDBCDriverLoader.java \
+        HIVEUtils.java \
+	HIVEDriverLoader.java \
  
 PG_CPPFLAGS=-D'PKG_LIB_DIR=$(pkglibdir)'
 
@@ -51,7 +51,7 @@ PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 else
-subdir = contrib/jdbc_fdw
+subdir = contrib/hive_fdw
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk

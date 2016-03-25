@@ -92,7 +92,7 @@ public class HIVEUtils
 			{
 				if (querytimeoutvalue != 0)
 				{
-					sql.setQueryTimeout(querytimeoutvalue);
+			//		sql.setQueryTimeout(querytimeoutvalue);
 				}
 
 			}
