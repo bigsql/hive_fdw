@@ -49,10 +49,10 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
 
 8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These environment variables are read at JVM initialization time.
 
-SET PGHOME = PG home directory path
-SET HIVE_HOME = Hive home directory path
-SET HADOOP_HOME = Hadoop home directory path
-SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
+   $SET PGHOME = PG home directory path
+   $SET HIVE_HOME = Hive home directory path
+   $SET HADOOP_HOME = Hadoop home directory path
+   $SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
 
 
 9) Enter psql & Set up hive2_fdw extension.
