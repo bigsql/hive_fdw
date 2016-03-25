@@ -307,7 +307,7 @@ JVMInitialization(Oid foreigntableid)
 	if (FunctionCallCheck == false)
 	{
 
-	        var_CP = getenv("HIVE_HIVE_CLASSPATH");
+	        var_CP = getenv("HIVE_JDBC_CLASSPATH");
                 elog(LOG, "HIVE_FDW: var_CP=%s", var_CP);
                 var_PGHOME = getenv("PGHOME");
                 elog(LOG, "HIVE_FDW: var_PGHOME=%s", var_PGHOME);
