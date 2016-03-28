@@ -2,7 +2,7 @@ HIVE2_FDW
 ========
 Please read the README before using hive2_fdw.
 
-hive2_FDW
+HIVE2_FDW
 ==============
 
 Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQL 9.5.
@@ -49,10 +49,10 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
 
 8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These environment variables are read at JVM initialization time.
 
-   $SET PGHOME = PG home directory path
-   $SET HIVE_HOME = Hive home directory path
-   $SET HADOOP_HOME = Hadoop home directory path
-   $SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
+   $ SET PGHOME = PG home directory path
+   $ SET HIVE_HOME = Hive home directory path
+   $ SET HADOOP_HOME = Hadoop home directory path
+   $ SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
 
 
 9) Enter psql & Set up hive2_fdw extension.
@@ -62,7 +62,7 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
      CREATE EXTENSION hive2_fdw;
  
      CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw 
-     OPTIONS(drivername 'org.apache.hive.jdbc.HiveDriver',url 'jdbc:hive2://localhost:10000/default',querytimeout '15',jarfile '/home/braj/hive/lib/hive-jdbc-1.2.1-standalone.jar');
+     OPTIONS(url 'jdbc:hive2://localhost:10000/default');
 
 10) Create a user mapping for the server.
 
@@ -70,11 +70,11 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
 
 11) Create a foreign table on the server.
 
-      CREATE FOREIGN TABLE test1 (id int) SERVER hive_serv OPTIONS (query 'SELECT * FROM test2');
+      CREATE FOREIGN TABLE oo (id int) SERVER cass_serv OPTIONS (table 'example.oorder');
 
 12) Query the foreign table.
 
-      SELECT * FROM test1 limit 5;
+      SELECT * FROM oo limit 5;
 
 The output should be :
 
