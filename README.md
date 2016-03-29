@@ -1,12 +1,8 @@
 HIVE2_FDW
 ========
-Please read the README before using hive2_fdw.
 
-HIVE2_FDW
-==============
-
-Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQL 9.5.
-
+Foreign Data Wrapper (FDW) that facilitates access to Hive Server2 from within PostgreSQL 9.5.                   
+https://hive.apache.org/
 
 1) Download and Compile PostgreSQL 9.5 from source
 
@@ -15,73 +11,65 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive from within PostgreSQ
     $ make
     $ make install
 
-
 2) Enter the /contrib directory in PostgreSQL folder.
 
     $ cd contrib
 
-
 3) Get hive2_fdw source.
 
     $ git clone https://bitbucket.org/openscg/hive2fdw.git
-
 
 4) Execute Make Clean
 
     $ cd hive2_fdw
     $ make clean
 
-
 5) Create a link to your Oracle JVM in the PostgreSQL lib folder
 
-   $ cd postgresql-9.5.x/lib
-   $ ln -s /usr/java/jdk1.8.0_51/jre/lib/amd64/server/libjvm.so libjvm.so 
-
+    $ cd postgresql-9.5.x/lib
+    $ ln -s /usr/java/jdk1.8.0_51/jre/lib/amd64/server/libjvm.so libjvm.so
 
 6) Execute Make Install 
 
     $ make install
-
     
 7) Download a copy of Hive and Hadoop from
    from https://hive.apache.org/downloads.html and https://archive.apache.org/dist/hadoop/core/
 
 
-8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These environment variables are read at JVM initialization time.
+8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These      environment variables are read at JVM initialisation time.
 
-   $ SET PGHOME = PG home directory path
-   $ SET HIVE_HOME = Hive home directory path
-   $ SET HADOOP_HOME = Hadoop home directory path
-   $ SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
+    SET PGHOME = PG home directory path
+    SET HIVE_HOME = Hive home directory path
+    SET HADOOP_HOME = Hadoop home directory path
+    SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
 
+ The following parameters can be set on a Cassandra foreign server
+object:
 
-9) Enter psql & Set up hive2_fdw extension.
+  * **`host`**: the address or hostname of the Hive2 server, Examples: "localhost" "127.0.0.1" "127.0.0.1,127.0.0.2", "server1.domain.com".
+  * **`port`**: the port number of the Hive2 server. Defaults to 10000.
+  
 
-    $ psql
+The following parameters can be set on a Hive foreign table object:
 
-     CREATE EXTENSION hive2_fdw;
- 
-     CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw 
-     OPTIONS(url 'jdbc:hive2://localhost:10000/default');
+  * **`table_name`**: the name of the Hive table to query.  Defaults to the foreign table name used in the relevant CREATE command.
 
-10) Create a user mapping for the server.
+Here is an example:
 
-      CREATE USER MAPPING FOR public SERVER hive_serv OPTIONS(username 'test', password 'test');
+```
+	-- load EXTENSION first time after install.
+	CREATE EXTENSION hive2_fdw;
 
-11) Create a foreign table on the server.
+	-- create server object
+	CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw
+		OPTIONS(host 'localhost', port '10000');
 
-      CREATE FOREIGN TABLE oo (id int) SERVER cass_serv OPTIONS (table 'example.oorder');
+	-- Create a user mapping for the server.
+	CREATE USER MAPPING FOR public SERVER hive_serv OPTIONS(username 'test', password 'test');
 
-12) Query the foreign table.
+	-- Create a foreign table on the server.
+	CREATE FOREIGN TABLE test (id int) SERVER hive_serv OPTIONS (table 'oorder');
 
-      SELECT * FROM oo limit 5;
-
-The output should be :
-
-    id   
-    ---------
-       1
-       2
-       3
-       4
-       5
+	-- Query the foreign table.
+	SELECT * FROM test limit 5;
