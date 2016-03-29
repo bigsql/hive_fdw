@@ -44,7 +44,7 @@ https://hive.apache.org/
     SET HADOOP_HOME = Hadoop home directory path
     SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
 
- The following parameters can be set on a Cassandra foreign server
+ The following parameters can be set on a Hive2 foreign server
 object:
 
   * **`host`**: the address or hostname of the Hive2 server, Examples: "localhost" "127.0.0.1" "127.0.0.1,127.0.0.2", "server1.domain.com".
