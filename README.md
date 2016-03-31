@@ -33,8 +33,8 @@ https://hive.apache.org/
 
     $ make install
     
-7) Download a copy of Hive and Hadoop from
-   from https://hive.apache.org/downloads.html and https://archive.apache.org/dist/hadoop/core/
+7) Download a copy of Hive-2.0.x from https://hive.apache.org and Hadoop from
+   https://archive.apache.org/dist/hadoop/core/
 
 
 8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These      environment variables are read at JVM initialisation time.
