@@ -77,16 +77,12 @@ static struct hiveFdwOption valid_options[] =
 {
 
 	/* Connection options */
-	{ "drivername",		ForeignServerRelationId },
-	{ "url",		ForeignServerRelationId },
-	{ "querytimeout",	ForeignServerRelationId },
-	{ "jarfile",		ForeignServerRelationId },
+        { "host",               ForeignServerRelationId },
+        { "port",               ForeignServerRelationId },
 	{ "maxheapsize",	ForeignServerRelationId },
 	{ "username",		UserMappingRelationId },
 	{ "password",		UserMappingRelationId },
-	{ "query",		ForeignTableRelationId },
 	{ "table",		ForeignTableRelationId },
-
 	/* Sentinel */
 	{ NULL,			InvalidOid }
 };
@@ -144,14 +140,11 @@ static void hiveEndForeignScan(ForeignScanState *node);
 static bool hiveIsValidOption(const char *option, Oid context);
 static void hiveGetOptions(
     Oid foreigntableid, 
-    char **drivername, 
-    char **url, 
-    int *querytimeout, 
-    char **jarfile, 
+    char **host,
+    int *port,	 
     int* maxheapsize, 
     char **username, 
     char **password, 
-    char **query, 
     char **table
 );
 
@@ -275,15 +268,12 @@ JVMInitialization(Oid foreigntableid)
 	static bool 	FunctionCallCheck = false;   /* This flag safeguards against multiple calls of JVMInitialization().*/
 	char 		strpkglibdir[] = STR_PKGLIBDIR;
 	char 		*classpath;
-	char		*svr_drivername = NULL;
-	char 		*svr_url = NULL;
+        char            *svr_host = NULL;
+        int             svr_port = 0;
 	char		*svr_username = NULL;
 	char		*svr_password = NULL;
-	char		*svr_query = NULL;
 	char		*svr_table = NULL;
-	char 		*svr_jarfile = NULL;
 	char 		*maxheapsizeoption = NULL;
-	int 		svr_querytimeout = 0;
 	int 		svr_maxheapsize = 0;
     	char            *var_CP = NULL;
         char            *var_PGHOME = NULL;
@@ -291,14 +281,11 @@ JVMInitialization(Oid foreigntableid)
 	
 	hiveGetOptions(
 	    foreigntableid, 
-	    &svr_drivername, 
-	    &svr_url, 
-	    &svr_querytimeout, 
-	    &svr_jarfile,
+	    &svr_host,
+            &svr_port, 
 	    &svr_maxheapsize, 
 	    &svr_username, 
 	    &svr_password, 
-	    &svr_query, 
 	    &svr_table
 	);
 
@@ -404,14 +391,12 @@ hive_fdw_validator(PG_FUNCTION_ARGS)
 {
 	List		*options_list = untransformRelOptions(PG_GETARG_DATUM(0));
 	Oid		catalog = PG_GETARG_OID(1);
-	char		*svr_drivername = NULL;
-	char 		*svr_url = NULL;
+        char            *svr_query = NULL; 
+	char            *svr_host = NULL;
+        int             svr_port = 0;
 	char		*svr_username = NULL;
 	char		*svr_password = NULL;
-	char		*svr_query = NULL;
 	char		*svr_table = NULL;
-	char 		*svr_jarfile = NULL;
-	int 		svr_querytimeout = 0;
 	int 		svr_maxheapsize = 0;
 	ListCell	*cell;
 
@@ -447,46 +432,22 @@ hive_fdw_validator(PG_FUNCTION_ARGS)
 				));
 		}
 
-		if (strcmp(def->defname, "drivername") == 0)
-		{
-			if (svr_drivername)
-				ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), 
-					errmsg("conflicting or redundant options: drivername (%s)", defGetString(def))
-					));
-
-			svr_drivername = defGetString(def);
-		}
-
-		if (strcmp(def->defname, "url") == 0)
-		{
-			if (svr_url)
-				ereport(ERROR, 
-					(errcode(ERRCODE_SYNTAX_ERROR), 
-					errmsg("conflicting or redundant options: url (%s)", defGetString(def))
-					));
-
-			svr_url = defGetString(def);
-		}
-
-		if (strcmp(def->defname, "querytimeout") == 0)
-		{
-			if (svr_querytimeout)
-				ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), 
-					errmsg("conflicting or redundant options: querytimeout (%s)", defGetString(def))
-					));
-
-			svr_querytimeout = atoi(defGetString(def));
-		}
-
-		if (strcmp(def->defname, "jarfile") == 0)
-		{
-			if (svr_jarfile)
-				ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), 
-					errmsg("conflicting or redundant options: jarfile (%s)", defGetString(def))
-					));
-
-			svr_jarfile = defGetString(def);
-		}
+		 if (strcmp(def->defname, "host") == 0)
+                {
+                        if (svr_host)
+                                ereport(ERROR,
+                                                (errcode(ERRCODE_SYNTAX_ERROR),
+                                                 errmsg("conflicting or redundant options")));
+                        svr_host = defGetString(def);
+                }
+                if (strcmp(def->defname, "port") == 0)
+                {
+                        if (svr_port)
+                                ereport(ERROR,
+                                                (errcode(ERRCODE_SYNTAX_ERROR),
+                                                 errmsg("conflicting or redundant options")));
+                        svr_port = atoi(defGetString(def));
+                }
 
 		if (strcmp(def->defname, "maxheapsize") == 0)
 		{
@@ -550,30 +511,10 @@ hive_fdw_validator(PG_FUNCTION_ARGS)
 			svr_table = defGetString(def);
 		}
 	}
-
-	if (catalog == ForeignServerRelationId && svr_drivername == NULL)
-	{
-		ereport(ERROR,
-		(errcode(ERRCODE_SYNTAX_ERROR),
-		errmsg("Driver name must be specified")
-		));
-	}
-	
-	if (catalog == ForeignServerRelationId && svr_url == NULL)
-	{
-		ereport(ERROR,
-		(errcode(ERRCODE_SYNTAX_ERROR),
-		errmsg("URL must be specified")
-		));
-	}
-
-	if (catalog == ForeignServerRelationId && svr_jarfile == NULL)
-	{
-		ereport(ERROR,
-		(errcode(ERRCODE_SYNTAX_ERROR),
-		errmsg("JAR file must be specified")
-		));
-	}
+	 if (catalog == ForeignServerRelationId && svr_host == NULL)
+                ereport(ERROR,
+                                (errcode(ERRCODE_SYNTAX_ERROR),
+                                 errmsg("host must be specified")));
 
 	if (catalog == ForeignTableRelationId && svr_query == NULL && svr_table == NULL)
 	{
@@ -606,8 +547,11 @@ hiveIsValidOption(const char *option, Oid context)
 /*
  * Fetch the options for a hive_fdw foreign table.
  */
-static void
+/*static void
 hiveGetOptions(Oid foreigntableid, char **drivername, char **url, int *querytimeout, char **jarfile, int *maxheapsize, char **username, char **password, char **query, char **table)
+*/
+static void
+hiveGetOptions(Oid foreigntableid, char **host, int *port, int *maxheapsize, char **username, char **password, char **table)
 {
 	ForeignTable	*f_table;
 	ForeignServer	*f_server;
@@ -632,26 +576,26 @@ hiveGetOptions(Oid foreigntableid, char **drivername, char **url, int *querytime
 	{
 		DefElem *def = (DefElem *) lfirst(lc);
 
-		if (strcmp(def->defname, "drivername") == 0)
+/*		if (strcmp(def->defname, "drivername") == 0)
 		{
 			*drivername = defGetString(def);
 		}
-
+*/
 		if (strcmp(def->defname, "username") == 0)
 		{
 			*username = defGetString(def);
 		}
 
-		if (strcmp(def->defname, "querytimeout") == 0)
+/*		if (strcmp(def->defname, "querytimeout") == 0)
 		{
 			*querytimeout = atoi(defGetString(def));
 		}
-
-		if (strcmp(def->defname, "jarfile") == 0)
+*/
+/*		if (strcmp(def->defname, "jarfile") == 0)
 		{
 			*jarfile = defGetString(def);
 		}
-
+*/
 		if (strcmp(def->defname, "maxheapsize") == 0)
 		{
 			*maxheapsize = atoi(defGetString(def));
@@ -662,20 +606,20 @@ hiveGetOptions(Oid foreigntableid, char **drivername, char **url, int *querytime
 			*password = defGetString(def);
 		}
 
-		if (strcmp(def->defname, "query") == 0)
-		{
-			*query = defGetString(def);
-		}
-
 		if (strcmp(def->defname, "table") == 0)
 		{
 			*table = defGetString(def);
 		}
 
-		if (strcmp(def->defname, "url") == 0)
-		{
-			*url = defGetString(def);
-		}
+                if (strcmp(def->defname, "host") == 0)
+                {
+                        *host = defGetString(def);
+                }
+                if (strcmp(def->defname, "port") == 0)
+                {
+                        *port = atoi(defGetString(def));
+                }
+
 	}
 }
 
@@ -694,6 +638,8 @@ hivePlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
 	char 		*svr_query = NULL;
 	char 		*svr_table = NULL;
 	char 		*svr_url = NULL;
+        char    *svr_host = NULL;
+        int             svr_port = 0;
 	char 		*svr_jarfile = NULL;
 	int 		svr_querytimeout = 0;
 	int 		svr_maxheapsize = 0;
@@ -708,14 +654,11 @@ hivePlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
 	/* Fetch options */
 	hiveGetOptions(
 	    foreigntableid, 
-	    &svr_drivername, 
-	    &svr_url, 
-	    &svr_querytimeout, 
-	    &svr_jarfile,
+	    &svr_host,
+	    &svr_port, 
 	    &svr_maxheapsize, 
 	    &svr_username, 
 	    &svr_password, 
-	    &svr_query, 
 	    &svr_table
 	);
 	/* Build the query */
@@ -747,6 +690,8 @@ hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
 {
 	char 		    *svr_drivername = NULL;
 	char 		    *svr_url = NULL;
+        char    *svr_host = NULL;
+        int             svr_port = 0;
 	char		    *svr_username = NULL;
 	char		    *svr_password = NULL;
 	char		    *svr_query = NULL;
@@ -758,14 +703,11 @@ hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
 	/* Fetch options  */
 	hiveGetOptions(
 	    RelationGetRelid(node->ss.ss_currentRelation), 
-	    &svr_drivername, 
-	    &svr_url, 
-	    &svr_querytimeout, 
-	    &svr_jarfile,
+	    &svr_host,
+	    &svr_port,
 	    &svr_maxheapsize, 
 	    &svr_username, 
 	    &svr_password, 
-	    &svr_query, 
 	    &svr_table
 	);
 
@@ -781,26 +723,25 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 {
 	char 			*svr_drivername = NULL;
 	char 			*svr_url = NULL;
+        char    		*svr_host = NULL;
+        int             	svr_port = 0;
+	char               	*portstr=NULL;
 	char			*svr_username = NULL;
 	char			*svr_password = NULL;
-	char			*svr_query = NULL;
 	char			*svr_table = NULL;
-	char 			*svr_jarfile = NULL;
-	int 			svr_querytimeout = 0;
+	char 			*svr_query = NULL;
 	int 			svr_maxheapsize = 0;
 	hiveFdwExecutionState   *festate;
 	char			*query;
 	jclass 			HIVEUtilsClass;
 	jclass		 	JavaString;
-	jstring 		StringArray[7];
+	jstring 		StringArray[5];
 	jstring 		initialize_result = NULL;
 	jmethodID		id_initialize;
 	jobjectArray		arg_array;
 	int 			counter = 0;
 	int 			referencedeletecounter = 0;
 	jfieldID 		id_numberofcolumns;
-	char 			*querytimeoutstr = NULL;
-	char 			*jar_classpath;
 	char 			strpkglibdir[] = STR_PKGLIBDIR;
 	char 			*initialize_result_cstring = NULL;
 	
@@ -809,14 +750,11 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	/* Fetch options  */
 	hiveGetOptions(
 	    RelationGetRelid(node->ss.ss_currentRelation), 
-	    &svr_drivername, 
-	    &svr_url, 
-	    &svr_querytimeout, 
-	    &svr_jarfile,
+            &svr_host,
+	    &svr_port, 
 	    &svr_maxheapsize, 
 	    &svr_username, 
 	    &svr_password, 
-	    &svr_query, 
 	    &svr_table
 	);
 
@@ -857,13 +795,9 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	{
 		elog(ERROR, "id_numberofcolumns is NULL");
 	}
-	
-	querytimeoutstr = (char*)palloc(sizeof(int));
-	jar_classpath = (char*)palloc(strlen(strpkglibdir) + strlen(svr_jarfile) + 2);
-
-	snprintf(querytimeoutstr, sizeof(int), "%d", svr_querytimeout);
-	snprintf(jar_classpath, (strlen(svr_jarfile) + 1), "%s", svr_jarfile);
-	
+	portstr = (char*)palloc(sizeof(int));	
+	snprintf(portstr, sizeof(int), "%d", svr_port);
+    
 	if (svr_username == NULL)
 	{
 		svr_username = "";
@@ -874,23 +808,21 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 		svr_password = "";
 	}
 	
-	StringArray[0] = (*env)->NewStringUTF(env, (festate->query));
-	StringArray[1] = (*env)->NewStringUTF(env, svr_drivername);
-	StringArray[2] = (*env)->NewStringUTF(env, svr_url);
-	StringArray[3] = (*env)->NewStringUTF(env, svr_username);
-	StringArray[4] = (*env)->NewStringUTF(env, svr_password);
-	StringArray[5] = (*env)->NewStringUTF(env, querytimeoutstr);
-	StringArray[6] = (*env)->NewStringUTF(env, jar_classpath);
+	StringArray[0] = (*env)->NewStringUTF(env, svr_host);
+	StringArray[1] = (*env)->NewStringUTF(env, portstr);
+	StringArray[2] = (*env)->NewStringUTF(env, svr_username);
+	StringArray[3] = (*env)->NewStringUTF(env, svr_password);
+        StringArray[4] = (*env)->NewStringUTF(env, svr_table);
 
 	JavaString = (*env)->FindClass(env, "java/lang/String");
 
-	arg_array = (*env)->NewObjectArray(env, 7, JavaString, StringArray[0]);
+	arg_array = (*env)->NewObjectArray(env, 5, JavaString, StringArray[0]);
 	if (arg_array == NULL)
 	{
 		elog(ERROR, "arg_array is NULL");
 	}
 
-	for (counter = 1; counter < 7; counter++)
+	for (counter = 1; counter < 5; counter++)
 	{		
 		(*env)->SetObjectArrayElement(env, arg_array, counter, StringArray[counter]);
 	}
@@ -913,7 +845,7 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	node->fdw_state = (void *) festate;
 	festate->NumberOfColumns = (*env)->GetIntField(env, java_call, id_numberofcolumns);
 
-	for (referencedeletecounter = 0; referencedeletecounter < 7; referencedeletecounter++)
+	for (referencedeletecounter = 0; referencedeletecounter < 5; referencedeletecounter++)
 	{
 		(*env)->DeleteLocalRef(env, StringArray[referencedeletecounter]);
 	}	
