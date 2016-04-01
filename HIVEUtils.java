@@ -48,14 +48,11 @@ public class HIVEUtils
 		Driver 			HIVEDriver = null;
 		String 			query = options_array[0];
 		String 			DriverClassName = options_array[1];
-	//	String 			url = options_array[2];
+		String 			url = options_array[2];
   		String 			userName = options_array[3];
   		String 			password = options_array[4];
 		int 			querytimeoutvalue = Integer.parseInt(options_array[5]);
- 		String  host=options_array[0];
-                int     port=Integer.parseInt(options_array[1]);
 
-	        String url = String.format("jdbc:hive2://%s:%d", host,port);	
 		exception_stack_trace_string_writer = new StringWriter();
  		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
 
@@ -139,7 +136,7 @@ public class HIVEUtils
 	ReturnResultSet()
 	{
 		int 	i = 0;
-		
+
 		try
 		{
 			/* Row-by-row processing is done in hive_fdw.One row
