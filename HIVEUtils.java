@@ -66,8 +66,7 @@ public class HIVEUtils
 
 			if (HIVE_Driver_Loader == null)
 			{
-				/* If HIVE_Driver_Loader is being 									
-				 * created. */
+				/* If HIVE_Driver_Loader is being created. */
 				HIVE_Driver_Loader = new HIVEDriverLoader(new URL[]{JarFile.toURI().toURL()}); 
 			}
 			else if (HIVE_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
@@ -92,7 +91,7 @@ public class HIVEUtils
 			{
 				if (querytimeoutvalue != 0)
 				{
-			//		sql.setQueryTimeout(querytimeoutvalue);
+					sql.setQueryTimeout(querytimeoutvalue);
 				}
 
 			}
