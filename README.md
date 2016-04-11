@@ -24,7 +24,7 @@ https://hive.apache.org/
     $ cd hive2_fdw
     $ make clean
 
-5) Create a link to your Oracle JVM in the PostgreSQL lib folder
+5) Create a link to your JVM in the PostgreSQL lib folder
 
     $ cd postgresql-9.5.x/lib
     $ ln -s /usr/java/jdk1.8.0_51/jre/lib/amd64/server/libjvm.so libjvm.so
@@ -42,7 +42,7 @@ https://hive.apache.org/
     SET PGHOME = PG home directory path
     SET HIVE_HOME = Hive home directory path
     SET HADOOP_HOME = Hadoop home directory path
-    SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):hadoop-core-1.2.1.jar 
+    SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar 
 
  The following parameters can be set on a Hive2 foreign server
 object:
@@ -57,19 +57,19 @@ The following parameters can be set on a Hive foreign table object:
 
 Here is an example:
 
-```
-	-- load EXTENSION first time after install.
-	CREATE EXTENSION hive2_fdw;
 
-	-- create server object
-	CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive2_fdw
+	-- load EXTENSION first time after install.
+	CREATE EXTENSION hive_fdw;
+
+        -- create server object
+	CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive_fdw
 		OPTIONS(host 'localhost', port '10000');
 
 	-- Create a user mapping for the server.
 	CREATE USER MAPPING FOR public SERVER hive_serv OPTIONS(username 'test', password 'test');
 
 	-- Create a foreign table on the server.
-	CREATE FOREIGN TABLE test (id int) SERVER hive_serv OPTIONS (table 'oorder');
+	CREATE FOREIGN TABLE test (id int) SERVER hive_serv OPTIONS (schema 'exmaple',table 'oorder');
 
 	-- Query the foreign table.
 	SELECT * FROM test limit 5;
