@@ -41,7 +41,7 @@ Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within Postgre
     SET PGHOME = PG home directory path
     SET HIVE_HOME = Hive home directory path
     SET HADOOP_HOME = Hadoop home directory path
-    SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar 
+    SET HADOOP_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar 
 
  The following parameters can be set on a Hive2 foreign server
 object:
