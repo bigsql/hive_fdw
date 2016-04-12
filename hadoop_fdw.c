@@ -270,15 +270,11 @@ JVMInitialization(Oid foreigntableid)
 	JavaVMInitArgs 	vm_args;
 	JavaVMOption 	*options;
 	static bool 	FunctionCallCheck = false;   /* This flag safeguards against multiple calls of JVMInitialization().*/
-	char 		strpkglibdir[] = STR_PKGLIBDIR;
 	char 		*classpath;
-	char		*svr_drivername = NULL;
-	char 		*svr_url = NULL;
 	char		*svr_username = NULL;
 	char		*svr_password = NULL;
 	char		*svr_query = NULL;
 	char		*svr_table = NULL;
-	char 		*svr_jarfile = NULL;
 	char 		*svr_host = NULL;
         char		*svr_schema = NULL;
 	int 		svr_port = 0;
@@ -308,9 +304,7 @@ JVMInitialization(Oid foreigntableid)
 	{
 
 	        var_CP = getenv("HADOOP_JDBC_CLASSPATH");
-                elog(LOG, "HADOOP_FDW: var_CP=%s", var_CP);
                 var_PGHOME = getenv("PGHOME");
-                elog(LOG, "HADOOP_FDW: var_PGHOME=%s", var_PGHOME);
 
                 cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
                 classpath = (char*)palloc(cp_len);
@@ -591,7 +585,7 @@ hadoop_fdw_validator(PG_FUNCTION_ARGS)
 		));
 	}
 
-	if (catalog == ForeignServerRelationId && svr_port  == NULL)
+	if (catalog == ForeignServerRelationId && svr_port  == 0)
         {
                 ereport(ERROR,
                 (errcode(ERRCODE_SYNTAX_ERROR),
@@ -770,13 +764,10 @@ hadoopPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel
 static void
 hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 {
-	char 		    *svr_drivername = NULL;
-	char 		    *svr_url = NULL;
 	char		    *svr_username = NULL;
 	char		    *svr_password = NULL;
 	char		    *svr_query = NULL;
 	char		    *svr_table = NULL;
-	char 		    *svr_jarfile = NULL;
 	char 		    *svr_schema = NULL;
 	int 		    svr_querytimeout = 0;
 	int 		    svr_maxheapsize = 0;
@@ -807,13 +798,11 @@ hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 static void
 hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 {
-	char 			*svr_drivername = NULL;
 	char 			*svr_url = NULL;
 	char			*svr_username = NULL;
 	char			*svr_password = NULL;
 	char			*svr_query = NULL;
 	char			*svr_table = NULL;
-	char 			*svr_jarfile = NULL;
 	char 			*svr_schema = NULL;
 	int 			svr_querytimeout = 0;
 	int 			svr_maxheapsize = 0;
@@ -830,7 +819,6 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 	jfieldID 		id_numberofcolumns;
 	char 			*querytimeoutstr = NULL;
 	char 			*jar_classpath;
-	char 			strpkglibdir[] = STR_PKGLIBDIR;
 	char 			*initialize_result_cstring = NULL;
  	char            	*var_CP = NULL;
         int             	cp_len = 0;
@@ -1120,7 +1108,7 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	SIGINTInterruptCheckProcess();
 
 	/* Create a ForeignPath node and add it as only possible path */
-	add_path(baserel, (Path*)create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL,NULL)); 
+	add_path(baserel, (Path*)create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NULL)); 
 }
 
 /*
