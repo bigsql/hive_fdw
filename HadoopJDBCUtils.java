@@ -1,15 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HIVE
- *
- * Copyright (c) 2012, PostgreSQL Global Development Group
- *
- * This software is released under the PostgreSQL Licence
- *
- * Author: Atri Sharma <atri.jiit@gmail.com>
+ *		  foreign-data wrapper for HADOOP 
  *
  * IDENTIFICATION
- *		  hive_fdw/HIVEUtils.java
+ *		  hadoop_fdw/HadoopJDBCUtils.java
  *
  *-------------------------------------------------------------------------
  */
@@ -21,7 +15,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.MalformedURLException;
 import java.util.*;
-public class HIVEUtils
+public class HadoopJDBCUtils 
 {
 	private ResultSet 		result_set;
 	private Connection 		conn;
@@ -29,7 +23,7 @@ public class HIVEUtils
 	private int 			NumberOfRows;
 	private Statement 		sql;
 	private String[] 		Iterate;
-	private static HIVEDriverLoader HIVE_Driver_Loader;
+	private static HadoopJDBCLoader	Hadoop_Driver_Loader;
 	private StringWriter 		exception_stack_trace_string_writer;
 	private PrintWriter 		exception_stack_trace_print_writer;
 
@@ -43,9 +37,9 @@ public class HIVEUtils
 	{       
 		DatabaseMetaData 	db_metadata;
 		ResultSetMetaData 	result_set_metadata;
-		Properties 		HIVEProperties;
-		Class 			HIVEDriverClass = null;
-		Driver 			HIVEDriver = null;
+		Properties 		HadoopProperties;
+		Class 			HadoopDriverClass = null;
+		Driver 			HadoopDriver = null;
 		String 			query = options_array[0];
 		String 			DriverClassName = options_array[1];
 		String 			url = options_array[2];
@@ -64,25 +58,25 @@ public class HIVEUtils
 			File 	JarFile = new File(options_array[6]);
 			String 	jarfile_path = JarFile.toURI().toURL().toString();
 
-			if (HIVE_Driver_Loader == null)
+			if (Hadoop_Driver_Loader == null)
 			{
-				/* If HIVE_Driver_Loader is being created. */
-				HIVE_Driver_Loader = new HIVEDriverLoader(new URL[]{JarFile.toURI().toURL()}); 
+				/* If Hadoop_Driver_Loader is being created. */
+				Hadoop_Driver_Loader = new HadoopJDBCLoader(new URL[]{JarFile.toURI().toURL()}); 
 			}
-			else if (HIVE_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
+			else if (Hadoop_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
 			{
-				HIVE_Driver_Loader.addPath(jarfile_path);
+				Hadoop_Driver_Loader.addPath(jarfile_path);
 			}	
 
-			HIVEDriverClass = HIVE_Driver_Loader.loadClass(DriverClassName);
+			HadoopDriverClass = Hadoop_Driver_Loader.loadClass(DriverClassName);
 
-			HIVEDriver = (Driver)HIVEDriverClass.newInstance();
-			HIVEProperties = new Properties();
+			HadoopDriver = (Driver)HadoopDriverClass.newInstance();
+			HadoopProperties = new Properties();
 
-			HIVEProperties.put("user", userName);
-			HIVEProperties.put("password", password);
+			HadoopProperties.put("user", userName);
+			HadoopProperties.put("password", password);
 
-			conn = HIVEDriver.connect(url, HIVEProperties);
+			conn = HadoopDriver.connect(url, HadoopProperties);
   		
   			db_metadata = conn.getMetaData();
 

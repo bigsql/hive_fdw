@@ -1,15 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HIVE
- *
- * Copyright (c) 2012, PostgreSQL Global Development Group
- *
- * This software is released under the PostgreSQL Licence
- *
- * Author: Atri Sharma <atri.jiit@gmail.com>
+ *		  foreign-data wrapper for HADOOP
  *
  * IDENTIFICATION
- *		  hive_fdw/hive_fdw.c
+ *		  hadoop_fdw/hadoop_fdw.c
  *
  *-------------------------------------------------------------------------
  */
@@ -63,17 +57,17 @@ static bool InterruptFlag;   /* Used for checking for SIGINT interrupt */
 /*
  * Describes the valid options for objects that use this wrapper.
  */
-struct hiveFdwOption
+struct hadoopFdwOption
 {
 	const char	*optname;
 	Oid		optcontext;	/* Oid of catalog in which option may appear */
 };
 
 /*
- * Valid options for hive_fdw.
+ * Valid options for hadoop_fdw.
  *
  */
-static struct hiveFdwOption valid_options[] =
+static struct hadoopFdwOption valid_options[] =
 {
 
 	/* Connection options */
@@ -98,34 +92,34 @@ static struct hiveFdwOption valid_options[] =
  * FDW-specific information for ForeignScanState.fdw_state.
  */
 
-typedef struct hiveFdwExecutionState
+typedef struct hadoopFdwExecutionState
 {
 	char		*query;
 	int		NumberOfRows;
 	jobject 	java_call;
 	int 		NumberOfColumns;
-} hiveFdwExecutionState;
+} hadoopFdwExecutionState;
 
 /*
  * SQL functions
  */
-extern Datum hive_fdw_handler(PG_FUNCTION_ARGS);
-extern Datum hive_fdw_validator(PG_FUNCTION_ARGS);
+extern Datum hadoop_fdw_handler(PG_FUNCTION_ARGS);
+extern Datum hadoop_fdw_validator(PG_FUNCTION_ARGS);
 
-PG_FUNCTION_INFO_V1(hive_fdw_handler);
-PG_FUNCTION_INFO_V1(hive_fdw_validator);
+PG_FUNCTION_INFO_V1(hadoop_fdw_handler);
+PG_FUNCTION_INFO_V1(hadoop_fdw_validator);
 
 /*
  * FDW callback routines
  */
 #if (PG_VERSION_NUM < 90200)
-	static FdwPlan *hivePlanForeignScan(Oid foreigntableid,PlannerInfo *root, RelOptInfo *baserel);
+	static FdwPlan *hadoopPlanForeignScan(Oid foreigntableid,PlannerInfo *root, RelOptInfo *baserel);
 #endif
 
 #if (PG_VERSION_NUM >= 90200)
-	static void hiveGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-	static void hiveGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-	static ForeignScan *hiveGetForeignPlan(
+	static void hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+	static void hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+	static ForeignScan *hadoopGetForeignPlan(
 	    PlannerInfo *root, 
 	    RelOptInfo *baserel, 
 	    Oid foreigntableid, 
@@ -135,17 +129,17 @@ PG_FUNCTION_INFO_V1(hive_fdw_validator);
 	);
 #endif
 
-static void hiveExplainForeignScan(ForeignScanState *node, ExplainState *es);
-static void hiveBeginForeignScan(ForeignScanState *node, int eflags);
-static TupleTableSlot *hiveIterateForeignScan(ForeignScanState *node);
-static void hiveReScanForeignScan(ForeignScanState *node);
-static void hiveEndForeignScan(ForeignScanState *node);
+static void hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es);
+static void hadoopBeginForeignScan(ForeignScanState *node, int eflags);
+static TupleTableSlot *hadoopIterateForeignScan(ForeignScanState *node);
+static void hadoopReScanForeignScan(ForeignScanState *node);
+static void hadoopEndForeignScan(ForeignScanState *node);
 
 /*
  * Helper functions
  */
-static bool hiveIsValidOption(const char *option, Oid context);
-static void hiveGetOptions(
+static bool hadoopIsValidOption(const char *option, Oid context);
+static void hadoopGetOptions(
     Oid foreigntableid, 
     int *querytimeout, 
     int* maxheapsize, 
@@ -189,18 +183,18 @@ SIGINTInterruptCheckProcess()
 
 	if (InterruptFlag == true)
 	{
-		jclass 		HIVEUtilsClass;
+		jclass 		HadoopJDBCUtilsClass;
 		jmethodID 	id_cancel;
 		jstring 	cancel_result = NULL;
 		char 		*cancel_result_cstring = NULL;
 
-		HIVEUtilsClass = (*env)->FindClass(env, "HIVEUtils");
-		if (HIVEUtilsClass == NULL) 
+		HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+		if (HadoopJDBCUtilsClass == NULL) 
 		{
-			elog(ERROR, "HIVEUtilsClass is NULL");
+			elog(ERROR, "HadoopJDBCUtilsClass is NULL");
 		}
 
-		id_cancel = (*env)->GetMethodID(env, HIVEUtilsClass, "Cancel", "()Ljava/lang/String;");
+		id_cancel = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "Cancel", "()Ljava/lang/String;");
 		if (id_cancel == NULL) 
 		{
 			elog(ERROR, "id_cancel is NULL");
@@ -266,7 +260,7 @@ DestroyJVM()
 /*
  * JVMInitialization
  *		Create the JVM which will be used for calling the Java routines
- *	        that use HIVE to connect and access the foreign database.
+ *	        that use HADOOP to connect and access the foreign database.
  *
  */
 static void
@@ -295,7 +289,7 @@ JVMInitialization(Oid foreigntableid)
         char            *var_PGHOME = NULL;
         int              cp_len = 0;
 	
-	hiveGetOptions(
+	hadoopGetOptions(
 	    foreigntableid, 
 	    &svr_querytimeout, 
 	    &svr_maxheapsize, 
@@ -313,10 +307,10 @@ JVMInitialization(Oid foreigntableid)
 	if (FunctionCallCheck == false)
 	{
 
-	        var_CP = getenv("HIVE_JDBC_CLASSPATH");
-                elog(LOG, "HIVE_FDW: var_CP=%s", var_CP);
+	        var_CP = getenv("HADOOP_JDBC_CLASSPATH");
+                elog(LOG, "HADOOP_FDW: var_CP=%s", var_CP);
                 var_PGHOME = getenv("PGHOME");
-                elog(LOG, "HIVE_FDW: var_PGHOME=%s", var_PGHOME);
+                elog(LOG, "HADOOP_FDW: var_PGHOME=%s", var_PGHOME);
 
                 cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
                 classpath = (char*)palloc(cp_len);
@@ -374,25 +368,25 @@ SIGINTInterruptHandler(int sig)
  * to my callback routines.
  */
 Datum
-hive_fdw_handler(PG_FUNCTION_ARGS)
+hadoop_fdw_handler(PG_FUNCTION_ARGS)
 {
 	FdwRoutine 	*fdwroutine = makeNode(FdwRoutine);
 	
 	#if (PG_VERSION_NUM < 90200)
-	fdwroutine->PlanForeignScan = hivePlanForeignScan;
+	fdwroutine->PlanForeignScan = hadoopPlanForeignScan;
 	#endif
 
 	#if (PG_VERSION_NUM >= 90200)
-	fdwroutine->GetForeignRelSize = hiveGetForeignRelSize;
-	fdwroutine->GetForeignPaths = hiveGetForeignPaths;
-	fdwroutine->GetForeignPlan = hiveGetForeignPlan;
+	fdwroutine->GetForeignRelSize = hadoopGetForeignRelSize;
+	fdwroutine->GetForeignPaths = hadoopGetForeignPaths;
+	fdwroutine->GetForeignPlan = hadoopGetForeignPlan;
 	#endif
 
-	fdwroutine->ExplainForeignScan = hiveExplainForeignScan;
-	fdwroutine->BeginForeignScan = hiveBeginForeignScan;
-	fdwroutine->IterateForeignScan = hiveIterateForeignScan;
-	fdwroutine->ReScanForeignScan = hiveReScanForeignScan;
-	fdwroutine->EndForeignScan = hiveEndForeignScan;
+	fdwroutine->ExplainForeignScan = hadoopExplainForeignScan;
+	fdwroutine->BeginForeignScan = hadoopBeginForeignScan;
+	fdwroutine->IterateForeignScan = hadoopIterateForeignScan;
+	fdwroutine->ReScanForeignScan = hadoopReScanForeignScan;
+	fdwroutine->EndForeignScan = hadoopEndForeignScan;
 
 	pqsignal(SIGINT, SIGINTInterruptHandler);
 
@@ -401,12 +395,12 @@ hive_fdw_handler(PG_FUNCTION_ARGS)
 
 /*
  * Validate the generic options given to a FOREIGN DATA WRAPPER, SERVER,
- * USER MAPPING or FOREIGN TABLE that uses hive_fdw.
+ * USER MAPPING or FOREIGN TABLE that uses hadoop_fdw.
  *
  * Raise an ERROR if the option or its value is considered invalid.
  */
 Datum
-hive_fdw_validator(PG_FUNCTION_ARGS)
+hadoop_fdw_validator(PG_FUNCTION_ARGS)
 {
 	List		*options_list = untransformRelOptions(PG_GETARG_DATUM(0));
 	Oid		catalog = PG_GETARG_OID(1);
@@ -425,16 +419,16 @@ hive_fdw_validator(PG_FUNCTION_ARGS)
 	int 		svr_port = 0;
 
 	/*
-	 * Check that only options supported by hive_fdw,
+	 * Check that only options supported by hadoop_fdw,
 	 * and allowed for the current object type, are given.
 	*/ 
 	foreach(cell, options_list)
 	{
 		DefElem	   *def = (DefElem *) lfirst(cell);
 
-		if (!hiveIsValidOption(def->defname, catalog))
+		if (!hadoopIsValidOption(def->defname, catalog))
 		{
-			struct hiveFdwOption *opt;
+			struct hadoopFdwOption *opt;
 			StringInfoData buf;
 
 			/*
@@ -621,9 +615,9 @@ hive_fdw_validator(PG_FUNCTION_ARGS)
  * context is the Oid of the catalog holding the object the option is for.
  */
 static bool
-hiveIsValidOption(const char *option, Oid context)
+hadoopIsValidOption(const char *option, Oid context)
 {
-	struct hiveFdwOption 	*opt;
+	struct hadoopFdwOption 	*opt;
 
 	for (opt = valid_options; opt->optname; opt++)
 	{
@@ -634,10 +628,10 @@ hiveIsValidOption(const char *option, Oid context)
 }
 
 /*
- * Fetch the options for a hive_fdw foreign table.
+ * Fetch the options for a hadoop_fdw foreign table.
  */
 static void
-hiveGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **table,char **host,int *port,char **schema)
+hadoopGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **table,char **host,int *port,char **schema)
 {
 	ForeignTable	*f_table;
 	ForeignServer	*f_server;
@@ -662,11 +656,6 @@ hiveGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **u
 	{
 		DefElem *def = (DefElem *) lfirst(lc);
 
-/*		if (strcmp(def->defname, "drivername") == 0)
-		{
-			*drivername = defGetString(def);
-		}
-*/
 		if (strcmp(def->defname, "username") == 0)
 		{
 			*username = defGetString(def);
@@ -677,11 +666,6 @@ hiveGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **u
 			*querytimeout = atoi(defGetString(def));
 		}
 
-/*		if (strcmp(def->defname, "jarfile") == 0)
-		{
-			*jarfile = defGetString(def);
-		}
-*/
 		if (strcmp(def->defname, "maxheapsize") == 0)
 		{
 			*maxheapsize = atoi(defGetString(def));
@@ -719,11 +703,11 @@ hiveGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **u
 
 #if (PG_VERSION_NUM < 90200)
 /*
- * hivePlanForeignScan
+ * hadoopPlanForeignScan
  *		Create a FdwPlan for a scan on the foreign table
  */
 static FdwPlan*
-hivePlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
+hadoopPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
 {
 	FdwPlan 	*fdwplan = NULL;
 	char		*svr_drivername = NULL;
@@ -747,7 +731,7 @@ hivePlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
 	JVMInitialization(foreigntableid);
 
 	/* Fetch options */
-	hiveGetOptions(
+	hadoopGetOptions(
 	    foreigntableid, 
 	    &svr_querytimeout, 
 	    &svr_maxheapsize, 
@@ -780,11 +764,11 @@ hivePlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
 #endif
 
 /*
- * hiveExplainForeignScan
+ * hadoopExplainForeignScan
  *		Produce extra output for EXPLAIN
  */
 static void
-hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
+hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 {
 	char 		    *svr_drivername = NULL;
 	char 		    *svr_url = NULL;
@@ -800,7 +784,7 @@ hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
 	int 		     svr_port = 0;
 
 	/* Fetch options  */
-	hiveGetOptions(
+	hadoopGetOptions(
 	    RelationGetRelid(node->ss.ss_currentRelation), 
 	    &svr_querytimeout, 
 	    &svr_maxheapsize, 
@@ -817,11 +801,11 @@ hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
 }
 
 /*
- * hiveBeginForeignScan
+ * hadoopBeginForeignScan
  *		Initiate access to the database
  */
 static void
-hiveBeginForeignScan(ForeignScanState *node, int eflags)
+hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 {
 	char 			*svr_drivername = NULL;
 	char 			*svr_url = NULL;
@@ -833,9 +817,9 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	char 			*svr_schema = NULL;
 	int 			svr_querytimeout = 0;
 	int 			svr_maxheapsize = 0;
-	hiveFdwExecutionState   *festate;
+	hadoopFdwExecutionState   *festate;
 	char			*query;
-	jclass 			HIVEUtilsClass;
+	jclass 			HadoopJDBCUtilsClass;
 	jclass		 	JavaString;
 	jstring 		StringArray[7];
 	jstring 		initialize_result = NULL;
@@ -857,7 +841,7 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	SIGINTInterruptCheckProcess();
 
 	/* Fetch options  */
-	hiveGetOptions(
+	hadoopGetOptions(
 	    RelationGetRelid(node->ss.ss_currentRelation), 
 	    &svr_querytimeout, 
 	    &svr_maxheapsize, 
@@ -871,7 +855,7 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	);
 
 	/* Set the options for JNI */
-	 var_CP = getenv("HIVE_JDBC_CLASSPATH");
+	 var_CP = getenv("HADOOP_JDBC_CLASSPATH");
         cp_len = strlen(var_CP) + 2;
         jar_classpath = (char*)palloc(cp_len);
         snprintf(jar_classpath ,(cp_len + 1), "%s", var_CP);
@@ -909,25 +893,25 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 	}
 
 	/* Stash away the state info we have already */
-	festate = (hiveFdwExecutionState *) palloc(sizeof(hiveFdwExecutionState));
+	festate = (hadoopFdwExecutionState *) palloc(sizeof(hadoopFdwExecutionState));
 	festate->query = query;
 	festate->NumberOfColumns = 0;
 	festate->NumberOfRows = 0;
 
 	/* Connect to the server and execute the query */
-	HIVEUtilsClass = (*env)->FindClass(env, "HIVEUtils");
-	if (HIVEUtilsClass == NULL) 
+	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+	if (HadoopJDBCUtilsClass == NULL) 
 	{
-		elog(ERROR, "HIVEUtilsClass is NULL");
+		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
 	}
 
-	id_initialize = (*env)->GetMethodID(env, HIVEUtilsClass, "Initialize", "([Ljava/lang/String;)Ljava/lang/String;");
+	id_initialize = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "Initialize", "([Ljava/lang/String;)Ljava/lang/String;");
 	if (id_initialize == NULL) 
 	{
 		elog(ERROR, "id_initialize is NULL");
 	}
 
-	id_numberofcolumns = (*env)->GetFieldID(env, HIVEUtilsClass, "NumberOfColumns" , "I");
+	id_numberofcolumns = (*env)->GetFieldID(env, HadoopJDBCUtilsClass, "NumberOfColumns" , "I");
 	if (id_numberofcolumns == NULL)
 	{
 		elog(ERROR, "id_numberofcolumns is NULL");
@@ -964,7 +948,7 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 		(*env)->SetObjectArrayElement(env, arg_array, counter, StringArray[counter]);
 	}
 	
-	java_call = (*env)->AllocObject(env, HIVEUtilsClass);
+	java_call = (*env)->AllocObject(env, HadoopJDBCUtilsClass);
 	if (java_call == NULL)
 	{
 		elog(ERROR, "java_call is NULL");
@@ -993,22 +977,22 @@ hiveBeginForeignScan(ForeignScanState *node, int eflags)
 }
 
 /*
- * hiveIterateForeignScan
+ * hadoopIterateForeignScan
  *		Read next record from the data file and store it into the
  *		ScanTupleSlot as a virtual tuple
  */
 static TupleTableSlot*
-hiveIterateForeignScan(ForeignScanState *node)
+hadoopIterateForeignScan(ForeignScanState *node)
 {
 	char 			**values;
 	HeapTuple		tuple;
 	jmethodID		id_returnresultset;
-	jclass 			HIVEUtilsClass;
+	jclass 			HadoopJDBCUtilsClass;
 	jobjectArray 		java_rowarray; 
 	int 		        i = 0;
 	int 			j = 0;
 	jstring 		tempString;
-	hiveFdwExecutionState *festate = (hiveFdwExecutionState *) node->fdw_state;
+	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	jobject 		java_call = festate->java_call;
 
@@ -1024,13 +1008,13 @@ hiveIterateForeignScan(ForeignScanState *node)
      	}
 
 
-	HIVEUtilsClass = (*env)->FindClass(env, "HIVEUtils");
-	if (HIVEUtilsClass == NULL) 
+	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+	if (HadoopJDBCUtilsClass == NULL) 
 	{
-		elog(ERROR, "HIVEUtilsClass is NULL");
+		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
 	}
 
-	id_returnresultset = (*env)->GetMethodID(env, HIVEUtilsClass, "ReturnResultSet", "()[Ljava/lang/String;");
+	id_returnresultset = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "ReturnResultSet", "()[Ljava/lang/String;");
 	if (id_returnresultset == NULL)
 	{
 		elog(ERROR, "id_returnresultset is NULL");
@@ -1068,28 +1052,28 @@ return (slot);
 }
 
 /*
- * hiveEndForeignScan
+ * hadoopEndForeignScan
  *		Finish scanning foreign table and dispose objects used for this scan
  */
 static void
-hiveEndForeignScan(ForeignScanState *node)
+hadoopEndForeignScan(ForeignScanState *node)
 {
 	jmethodID 			id_close;
-	jclass 				HIVEUtilsClass;
+	jclass 				HadoopJDBCUtilsClass;
 	jstring 			close_result = NULL;
 	char 				*close_result_cstring = NULL;
-	hiveFdwExecutionState *festate = (hiveFdwExecutionState *) node->fdw_state;
+	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	jobject 			java_call = festate->java_call;
 
 	SIGINTInterruptCheckProcess();
 
-	HIVEUtilsClass = (*env)->FindClass(env, "HIVEUtils");
-	if (HIVEUtilsClass == NULL) 
+	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+	if (HadoopJDBCUtilsClass == NULL) 
 	{
-		elog(ERROR, "HIVEUtilsClass is NULL");
+		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
 	}
 
-	id_close = (*env)->GetMethodID(env, HIVEUtilsClass, "Close", "()Ljava/lang/String;");
+	id_close = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "Close", "()Ljava/lang/String;");
 	if (id_close == NULL) 
 	{
 		elog(ERROR, "id_close is NULL");
@@ -1113,22 +1097,22 @@ hiveEndForeignScan(ForeignScanState *node)
 }
 
 /*
- * hiveReScanForeignScan
+ * hadoopReScanForeignScan
  *		Rescan table, possibly with new parameters
  */
 static void
-hiveReScanForeignScan(ForeignScanState *node)
+hadoopReScanForeignScan(ForeignScanState *node)
 {
 	SIGINTInterruptCheckProcess();
 }
 
 #if (PG_VERSION_NUM >= 90200)
 /*
- * hiveGetForeignPaths
+ * hadoopGetForeignPaths
  *		(9.2+) Get the foreign paths
  */
 static void
-hiveGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
 	Cost 		startup_cost = 0;
 	Cost 		total_cost = 0;
@@ -1140,11 +1124,11 @@ hiveGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 }
 
 /*
- * hiveGetForeignPlan
+ * hadoopGetForeignPlan
  *		(9.2+) Get a foreign scan plan node
  */
 static ForeignScan *
-hiveGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses)
+hadoopGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses)
 {
 	Index 		scan_relid = baserel->relid;
 
@@ -1159,11 +1143,11 @@ hiveGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, F
 }
 
 /*
- * hiveGetForeignRelSize
+ * hadoopGetForeignRelSize
  *		(9.2+) Get a foreign scan plan node
  */
 static void
-hiveGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
 	SIGINTInterruptCheckProcess();
 }

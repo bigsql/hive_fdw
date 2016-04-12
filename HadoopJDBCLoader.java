@@ -1,15 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HIVE
- *
- * Copyright (c) 2012, PostgreSQL Global Development Group
- *
- * This software is released under the PostgreSQL Licence
- *
- * Author: Atri Sharma <atri.jiit@gmail.com>
+ *		  foreign-data wrapper for HADOOP 
  *
  * IDENTIFICATION
- *		  hive_fdw/HIVEDriverLoader.java
+ *		  hadoop_fdw/HadoopJDBCLoader.java
  *
  *-------------------------------------------------------------------------
  */
@@ -19,15 +13,15 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.MalformedURLException;
  
-public class HIVEDriverLoader extends URLClassLoader
+public class HadoopJDBCLoader extends URLClassLoader
 {
 
 /*
- * HIVEDriverLoader
- *		Constructor of HIVEDriverLoader class.
+ * HadoopJDBCLoader
+ *		Constructor of HadoopJDBCLoader class.
  */
 	public 
-	HIVEDriverLoader(URL[] path)
+	HadoopJDBCLoader(URL[] path)
 	{
 		super(path);
 	}
