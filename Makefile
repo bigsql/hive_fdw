@@ -1,27 +1,21 @@
 ##########################################################################
 #
-#                foreign-data wrapper for HIVE
-#
-# Copyright (c) 2012, PostgreSQL Global Development Group
-#
-# This software is released under the PostgreSQL Licence
-#
-# Author:Atri Sharma <atri.jiit@gmail.com>
+#                foreign-data wrapper for HADOOP 
 #
 # IDENTIFICATION
-#                 hive_fdw/Makefile
+#                 hadoop_fdw/Makefile
 # 
 ##########################################################################
 
-MODULE_big = hive_fdw
-OBJS = hive_fdw.o
+MODULE_big = hadoop_fdw
+OBJS = hadoop_fdw.o
 
-EXTENSION = hive_fdw
-DATA = hive_fdw--1.0.sql
+EXTENSION = hadoop_fdw
+DATA = hadoop_fdw--2.0.sql
 
-REGRESS = hive_fdw
+REGRESS = hadoop_fdw
 
-HIVE_CONFIG = hive_config
+HADOOP_CONFIG = hadoop_config
 
 SHLIB_LINK = -ljvm
 
@@ -34,8 +28,8 @@ endif
 TRGTS = JAVAFILES
 
 JAVA_SOURCES = \
-        HIVEUtils.java \
-	HIVEDriverLoader.java \
+        HadoopJDBCUtils.java \
+	HadoopJDBCLoader.java \
  
 PG_CPPFLAGS=-D'PKG_LIB_DIR=$(pkglibdir)'
 
@@ -51,7 +45,7 @@ PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 else
-subdir = contrib/hive_fdw
+subdir = contrib/hadoop_fdw
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk

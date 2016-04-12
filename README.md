@@ -1,8 +1,7 @@
-HIVE2_FDW
+HADOOP_FDW
 ========
 
-Foreign Data Wrapper (FDW) that facilitates access to Hive Server2 from within PostgreSQL 9.5.                   
-https://hive.apache.org/
+Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 9.5.                   
 
 1) Download and Compile PostgreSQL 9.5 from source
 
@@ -15,13 +14,13 @@ https://hive.apache.org/
 
     $ cd contrib
 
-3) Get hive2_fdw source.
+3) Get hadoop_fdw source.
 
-    $ git clone https://bitbucket.org/openscg/hive2fdw.git
+    $ git clone https://bitbucket.org/openscg/hadoop_fdw.git
 
 4) Execute Make Clean
 
-    $ cd hive2_fdw
+    $ cd hadoop_fdw
     $ make clean
 
 5) Create a link to your JVM in the PostgreSQL lib folder
@@ -37,12 +36,12 @@ https://hive.apache.org/
    https://archive.apache.org/dist/hadoop/core/
 
 
-8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HIVE_JDBC_CLASSPATH before starting up PG.These      environment variables are read at JVM initialisation time.
+8) Set environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HADOOP_JDBC_CLASSPATH before starting up PG.These      environment variables are read at JVM initialisation time.
 
     SET PGHOME = PG home directory path
     SET HIVE_HOME = Hive home directory path
     SET HADOOP_HOME = Hadoop home directory path
-    SET HIVE_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar 
+    SET HADOOP_JDBC_CLASSPATH = .:$(echo $HIVE_HOME/lib/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar 
 
  The following parameters can be set on a Hive2 foreign server
 object:
@@ -51,7 +50,7 @@ object:
   * **`port`**: the port number of the Hive2 server. Defaults to 10000.
   
 
-The following parameters can be set on a Hive foreign table object:
+The following parameters can be set on a Hadoop foreign table object:
 
   * **`table_name`**: the name of the Hive table to query.  Defaults to the foreign table name used in the relevant CREATE command.
 
@@ -59,17 +58,17 @@ Here is an example:
 
 
 	-- load EXTENSION first time after install.
-	CREATE EXTENSION hive_fdw;
+	CREATE EXTENSION hadoop_fdw;
 
         -- create server object
-	CREATE SERVER hive_serv FOREIGN DATA WRAPPER hive_fdw
+	CREATE SERVER hadoop_serv FOREIGN DATA WRAPPER hadoop_fdw
 		OPTIONS(host 'localhost', port '10000');
 
 	-- Create a user mapping for the server.
-	CREATE USER MAPPING FOR public SERVER hive_serv OPTIONS(username 'test', password 'test');
+	CREATE USER MAPPING FOR public SERVER hadoop_serv OPTIONS(username 'test', password 'test');
 
 	-- Create a foreign table on the server.
-	CREATE FOREIGN TABLE test (id int) SERVER hive_serv OPTIONS (schema 'exmaple',table 'oorder');
+	CREATE FOREIGN TABLE test (id int) SERVER hadoop_serv OPTIONS (schema 'exmaple',table 'oorder');
 
 	-- Query the foreign table.
 	SELECT * FROM test limit 5;
