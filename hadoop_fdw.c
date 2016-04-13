@@ -306,7 +306,17 @@ JVMInitialization(Oid foreigntableid)
 	        var_CP = getenv("HADOOP_JDBC_CLASSPATH");
                 var_PGHOME = getenv("PGHOME");
 
-                cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
+		if( !var_CP )
+	        {
+			elog(ERROR,"Please set the environment variable HADOOP_JDBC_CLASSPATH");
+	 	}
+        	
+		if( !var_PGHOME )
+		{
+			elog(ERROR,"Please set the environment variable PGHOME");	
+		}
+	
+		cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
                 classpath = (char*)palloc(cp_len);
                 snprintf(classpath, cp_len, "-Djava.class.path=%s/lib:%s", var_PGHOME, var_CP);
 
@@ -843,7 +853,7 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 	);
 
 	/* Set the options for JNI */
-	 var_CP = getenv("HADOOP_JDBC_CLASSPATH");
+	var_CP = getenv("HADOOP_JDBC_CLASSPATH");
         cp_len = strlen(var_CP) + 2;
         jar_classpath = (char*)palloc(cp_len);
         snprintf(jar_classpath ,(cp_len + 1), "%s", var_CP);
