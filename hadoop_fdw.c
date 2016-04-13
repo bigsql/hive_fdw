@@ -326,7 +326,13 @@ JVMInitialization(Oid foreigntableid)
 
 		cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
 		classpath = (char *) palloc(cp_len);
-		snprintf(classpath, cp_len, "-Djava.class.path=%s/lib:%s", var_PGHOME, var_CP);
+		snprintf(classpath, cp_len,
+#if defined(__MINGW64__) || defined(WIN32)
+		         "-Djava.class.path=%s\\lib;%s",
+#else
+		         "-Djava.class.path=%s/lib:%s",
+#endif /* defined(__MINGW64__) || defined(WIN32) */
+		         var_PGHOME, var_CP);
 
 		if (svr_maxheapsize != 0)		/* If the user has given a value for
 										 * setting the max heap size of the
