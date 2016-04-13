@@ -130,6 +130,9 @@ hadoopGetForeignPlan(
 					 ForeignPath *best_path,
 					 List *tlist,
 					 List *scan_clauses
+#if PG_VERSION_NUM >= 90500
+					 , Plan *outer_plan
+#endif  /* PG_VERSION_NUM >= 90500 */
 );
 #endif
 
@@ -1145,7 +1148,16 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
  *		(9.2+) Get a foreign scan plan node
  */
 static ForeignScan *
-hadoopGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses)
+hadoopGetForeignPlan(PlannerInfo *root,
+					 RelOptInfo *baserel,
+					 Oid foreigntableid,
+					 ForeignPath *best_path,
+					 List *tlist,
+					 List *scan_clauses
+#if PG_VERSION_NUM >= 90500
+					 ,Plan *outer_plan
+#endif   /* PG_VERSION_NUM >= 90500 */
+)
 {
 	Index		scan_relid = baserel->relid;
 
