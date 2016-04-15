@@ -301,7 +301,7 @@ CREATE FOREIGN TABLE sample_07 (
 With the `FOREIGN TABLE` in place, run a query against it to retrieve
 data from Hive:
 
-```
+```sql
 postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
   code   | total_emp
 ---------+-----------
