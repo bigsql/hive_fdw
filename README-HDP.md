@@ -21,12 +21,10 @@ We also assume that the VM is accessible to the machine running
 PostgreSQL with the name **hdp-vm** and that the host running PostgreSQL
 can connect to **hdp-vm** on Hive TCP port 10000.
 
-Last, we assume that you have not made any changes to the Hive databases
-on the VM.
-
 ### Copy the Hive Client JARs from HDP ###
 
-First, please determine the JAR files we need to copy from the HDP VM.
+First, please determine the JAR files that you will need to copy from
+the HDP VM.
 
 Connect to the VM using SSH per Hortonworks instructions:
 
@@ -64,26 +62,23 @@ The JAR files we need are:
               `--- hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
 
-For your version of HDP, you can determine the specific versions of the
-JAR files by running the `ls` commands with glob patterns shown below:
+If you are trying this with a different version of HDP, you can
+determine the specific versions of the JAR files by running the `ls`
+commands with the glob patterns shown below:
 
 ```bash
-[hive@sandbox ~]$ ls /usr/hdp/2.4.0.0-169/hadoop/hadoop-common*[0-9].jar
+[hive@sandbox ~]$ ls /usr/hdp/*/hadoop/hadoop-common*[0-9].jar
 /usr/hdp/2.4.0.0-169/hadoop/hadoop-common-2.7.1.2.4.0.0-169.jar
-[hive@sandbox ~]$ ls /usr/hdp/2.4.0.0-169/hive/lib/hive*jdbc*standalone.jar
+[hive@sandbox ~]$ ls /usr/hdp/*/hive/lib/hive*jdbc*standalone.jar
 /usr/hdp/2.4.0.0-169/hive/lib/hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
 
-SCP these two JAR files to a directory `hive-client-lib` on the
-PostgreSQL host that you are installing the Hadoop FDW on.
+Please note that the pattern `hadoop-common*[0-9].jar` precludes the
+file `hadoop-common*-test.jar` from appearing.
 
-## Install Hadoop-FDW ##
-
-Please install the Hadoop FDW in one of the following ways:
-
-- As a binary from the PGC Update Manager.
-
-- From source; by following the instructions in [README.md](README.md).
+Once you have the paths for the two JAR files, SCP them to a directory
+`hive-client-lib` on the PostgreSQL host that you are installing the
+Hadoop FDW on.
 
 ## Test that you are able to connect to Hive ##
 
@@ -165,10 +160,18 @@ default
 xademo
 ```
 
-## Prepare the Environment ##
+## Install Hadoop-FDW ##
 
-After establishing a connection with Hive successfully, we can move to
-the PostgreSQL setup.
+After establishing a connection with Hive successfully, we can focus on
+the PostgreSQL side.
+
+Please install the Hadoop FDW in one of the following ways:
+
+- As a binary from the PGC Update Manager.
+
+- From source; by following the instructions in [README.md](README.md).
+
+## Prepare the Environment ##
 
 The Hadoop FDW needs two environment variables set for the PostgreSQL
 server:
