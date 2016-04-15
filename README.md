@@ -1,10 +1,10 @@
-Using HADOOP-FDW with HDP on Hortonworks Sandbox VM
-===================================================
+Using HADOOP-FDW with an HDP Sandbox VM
+========================================
 
 ## Overview ##
 
-The Hadoop FDW extension - built into our Windows, OSX & Linux
-distributions - allows access to Hive TABLEs from PostgreSQL.
+This HadoopFDW extension is built into the Windows, OSX & Linux
+distributions of PostgreSQL by BigSQL.  It allows access to Hive tables from PostgreSQL.
 
 This document elucidates the steps needed to run it against *HDP 2.4.0 on
 Hortonworks Sandbox VM*.
