@@ -4,7 +4,7 @@ Using HADOOP-FDW with an HDP Sandbox VM
 ## Overview ##
 
 This HadoopFDW extension is built into the Windows, OSX & Linux
-distributions of [PostgreSQL](http://bigsql.org) by BigSQL.  It allows
+distributions of [PostgreSQL by BigSQL](http://bigsql.org).  It allows
 access to Hive tables from PostgreSQL.
 
 This document elucidates the steps needed to run it against *HDP 2.4.0 on
@@ -163,14 +163,11 @@ xademo
 
 ## Install Hadoop-FDW ##
 
-After establishing a connection with Hive successfully, we can focus on
-the PostgreSQL side.
+This FDW is included in the [PostgreSQL by BigSQL](http://bigsql.org)
+distribution.  All you have to do is follow the sections below.
 
-Please install the Hadoop FDW in one of the following ways:
-
-- As a binary from the PGC Update Manager.
-
-- From source; by following the instructions in [BUILD.md](BUILD.md).
+If you are installing from source, please follow the instructions in
+[BUILD.md](BUILD.md).
 
 ## Prepare the Environment ##
 
