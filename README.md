@@ -1,23 +1,24 @@
 HADOOP_FDW
-========
+==========
 
 Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 9.5.
 
 ## Prepare
 
 In addition to normal PostgreSQL FDW pre-reqs, the primary specific
-requirement for this FDW is a set of the Hadoop/Hive client jar files
-the details of which are provided below.
+requirements for this FDW are a JDK (we test with JDK 8) and a set of
+Hive client JAR files for the Hadoop distribution you are connecting
+with.
 
 ## Install
 
-This FDW is included in the BigSQL by PostgreSQL distribution.  All you have to do is follow the usage instructions below.
+This FDW is included in the BigSQL by PostgreSQL distribution.  All you
+have to do is follow the usage instructions below.
 
 ## Building from Source
 
 First, download the source code under the contrib subdirectory of the
 PostgreSQL source tree and then build and install the FDW as below:
-
 
 1) Create a link to your JVM in the PostgreSQL lib folder
 
