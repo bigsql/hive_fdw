@@ -1,5 +1,5 @@
-Using HADOOP-FDW 2 with HDP on Hortonworks Sandbox VM
-=====================================================
+Using HADOOP-FDW with HDP on Hortonworks Sandbox VM
+===================================================
 
 ## Overview ##
 
