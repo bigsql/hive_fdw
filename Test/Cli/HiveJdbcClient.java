@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 public class HiveJdbcClient {
 
-    private static final String url      = "jdbc:hive2://192.168.1.97:10000";
+    private static final String url      = "jdbc:hive2://hadoop-vm:10000";
     private static final String user     = "";
     private static final String password = "";
     private static final String query    = "SHOW DATABASES";
