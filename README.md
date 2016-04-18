@@ -111,8 +111,8 @@ Hadoop FDW on.
 
 ## Test that you are able to connect to Hive ##
 
-Create a small JDBC program **HiveJdbcClient.java** with the following
-contents:
+On the PostgreSQL host, create a small JDBC program
+**HiveJdbcClient.java** with the following contents:
 
 ```java
 import java.sql.Connection;
