@@ -307,3 +307,37 @@ postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
  11-1011 |    299160
 (3 rows)
 ```
+## Use with an CDH Sample TABLE ##
+
+The sample TABLE `sample_07` ships as part of the CDH Sandbox VM.  We
+show you how to access it from psql as superuser below:
+
+```sql
+
+CREATE EXTENSION hadoop_fdw;
+
+CREATE SERVER hadoop_server FOREIGN DATA WRAPPER hadoop_fdw
+  OPTIONS (HOST 'cdh-vm', PORT '10000');
+
+CREATE USER MAPPING FOR PUBLIC SERVER hadoop_server;
+
+CREATE FOREIGN TABLE sample_07 (
+    code                   TEXT,
+    description            TEXT,
+    total_emp              INT,
+    salary                 INT
+) SERVER hadoop_server OPTIONS (TABLE 'sample_07');
+```
+
+With the `FOREIGN TABLE` in place, run a query against it to retrieve
+data from Hive:
+
+```sql
+postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
+  code   | total_emp
+---------+-----------
+ 00-0000 | 134354250
+ 11-0000 |   6003930
+ 11-1011 |    299160
+(3 rows)
+```
