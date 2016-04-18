@@ -171,24 +171,38 @@ java -cp .:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' ':') HiveJdbcClient
 ### Windows ###
 
 Assuming that you copied the Hive client JAR files to the directory
-`C:\hive-client-lib`, run the following command in the Command
-Prompt to execute the program:
+`C:\hive-client-lib`, run the following command in the Command Prompt to
+execute the program.
 
-For CDH
+#### CDH ####
 
 ```bat
 java -cp .;"C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar";"C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar" HiveJdbcClient
 ```
 
-For HDP
+#### HDP ####
+
 ```bat
 java -cp .;"C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar";"C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar" HiveJdbcClient
 ```
 
 ### Confirm Output ###
 
-No matter the platform you ran the test program on, the last three lines
-of its output should be:
+No matter the platform you ran the program on, please confirm the output
+for the program as shown below:
+
+#### CDH ####
+
+The last two lines of the output should be:
+
+```
+Running: SHOW DATABASES
+default
+```
+
+#### HDP ####
+
+The last three lines of the output should be:
 
 ```
 Running: SHOW DATABASES
