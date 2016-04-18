@@ -165,7 +165,7 @@ Assuming that you copied the Hive client JAR files to the directory
 shell to execute the program:
 
 ```sh
-java -cp .:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' ':') HiveJdbcClient
+java -cp .:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :) HiveJdbcClient
 ```
 
 ### Windows ###
