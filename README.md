@@ -25,8 +25,9 @@ downloaded and installed one of the following VMs:
 We also assume that your Hadoop VM is accessible to the machine running
 PostgreSQL with the name **hadoop-vm** and that the host running
 PostgreSQL can connect to **hadoop-vm** on Hive TCP port 10000 as well
-as SSH TCP port 22.  Last, we assume that the host running PostgreSQL
-has JDK 8 installed.
+as SSH TCP port 22.
+
+Last, we assume that the host running PostgreSQL has JDK 8 installed.
 
 ### Copy the Hive Client JARs ###
 
