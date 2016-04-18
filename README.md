@@ -177,13 +177,13 @@ execute the program.
 #### CDH ####
 
 ```bat
-java -cp .;"C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar";"C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar" HiveJdbcClient
+java -cp .;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar HiveJdbcClient
 ```
 
 #### HDP ####
 
 ```bat
-java -cp .;"C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar";"C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar" HiveJdbcClient
+java -cp .;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar HiveJdbcClient
 ```
 
 ### Confirm Output ###
