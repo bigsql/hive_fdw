@@ -230,7 +230,8 @@ server:
 
 - **HADOOP_JDBC_CLASSPATH**
 
-    The `CLASSPATH` referencing all the Hive client JAR files we identified previously.
+    The `CLASSPATH` referencing all the Hive client JAR files we
+    identified previously.
 
 We provide OS-specific examples for these variables below.
 
@@ -282,13 +283,15 @@ set PATH=%JAVA_HOME%\bin;%JAVA_HOME%\jre\bin\server;%PATH%
 
 Next, in the Command Prompt, set up the requisite environment variables.
 
-For CDH
+#### CDH ####
+
 ```bat
 set PGHOME=C:\msys2-x64\usr\local\pgsql
 set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
-For HDP
+#### HDP ####
+
 ```bat
 set PGHOME=C:\msys2-x64\usr\local\pgsql
 set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
