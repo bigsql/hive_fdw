@@ -19,10 +19,6 @@ you have downloaded and installed CDH 5.5 on Cloudera Sandbox VM from
 [Cloudera Sandbox Downloads](http://cloudera.com/downloads.html)
 as well as the Oracle JDK 8.
 
-We also assume that the VM is accessible to the machine running
-PostgreSQL with the name **cdh-vm** and that the host running PostgreSQL
-can connect to **cdh-vm** on Hive TCP port 10000.
-
 ## For HDP Hortonworks Sandbox VM ##
 We have tested with HDP versions 2.3.x and 2.4.0 from Windows, OSX and 
 Linux using Java 8. For the purposes of this document, we assume that 
@@ -31,13 +27,13 @@ you have downloaded and installed HDP 2.4 on Hortonworks Sandbox VM from
 as well as the Oracle JDK 8.
 
 We also assume that the VM is accessible to the machine running 
-PostgreSQL with the name **hdp-vm** and that the host running PostgreSQL 
-can connect to **hdp-vm** on Hive TCP port 10000.
+PostgreSQL with the name **sandbox-vm** and that the host running PostgreSQL 
+can connect to **sandbox-vm** on Hive TCP port 10000.
 
 ### Copy the Hive Client JARs ###
 
 First, please determine the JAR files that you will need to copy from
-the CDH VM and HDP VM
+the CDH VM Or HDP VM
 
 Connect to the VM using SSH as per the following instructions:
 
@@ -103,6 +99,7 @@ commands with the glob patterns shown below:
 /usr/hdp/2.4.0.0-169/hadoop/hadoop-common-2.7.1.2.4.0.0-169.jar
 [hive@sandbox ~]$ ls /usr/hdp/*/hive/lib/hive*jdbc*standalone.jar
 /usr/hdp/2.4.0.0-169/hive/lib/hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
+```
 
 Please note that the pattern `hadoop-common*[0-9].jar` precludes the
 file `hadoop-common*-test.jar` from appearing.
@@ -176,14 +173,15 @@ Assuming that you copied the Hive client JAR files to the directory
 `C:\hive-client-lib`, run the following command in the Command
 Prompt to execute the program:
 
-```bat
 For CDH
 
+```bat
 java -cp .;"C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar";"C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar" HiveJdbcClient
+```
 
 For HDP
+```bat
 java -cp .;"C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar";"C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar" HiveJdbcClient
-
 ```
 
 ### Confirm Output ###
@@ -269,14 +267,14 @@ set PATH=%JAVA_HOME%\bin;%JAVA_HOME%\jre\bin\server;%PATH%
 
 Next, in the Command Prompt, set up the requisite environment variables.
 
-```bat
 For CDH
-
+```bat
 set PGHOME=C:\msys2-x64\usr\local\pgsql
 set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
+```
 
 For HDP
-
+```bat
 set PGHOME=C:\msys2-x64\usr\local\pgsql
 set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
