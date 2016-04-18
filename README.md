@@ -306,7 +306,7 @@ server pick up the variables we set up.
 installed, please install the legacy Java 6 runtime from
 [Apple](https://support.apple.com/kb/DL1572?locale=en_US) before
 continuing otherwise the FDW will crash the PostgreSQL server because of
-[this](https://bugs.openjdk.java.net/browse/JDK-713135) open issue with
+[this](https://bugs.openjdk.java.net/browse/JDK-7131356) open issue with
 the Oracle JDK.**
 
 We assume the PostgreSQL prefix (`/usr/local/pgsql`) and that the Hive
