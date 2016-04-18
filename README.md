@@ -1,4 +1,4 @@
-Using HADOOP-FDW with an HDP Sandbox VM
+Using HADOOP-FDW with a CDH Sandbox VM
 ========================================
 
 ## Overview ##
@@ -7,71 +7,42 @@ This HadoopFDW extension is built into the Windows, OSX & Linux
 distributions of [PostgreSQL by BigSQL](http://bigsql.org).  It allows
 access to Hive tables from PostgreSQL.
 
-This document elucidates the steps needed to run it against *HDP 2.4.0 on
-Hortonworks Sandbox VM*.
+This document elucidates the steps needed to run it against *CDH 5.5.0 on
+Cloudera Sandbox VM*.
 
 ## Pre-Requisites ##
 
-We have tested with HDP versions 2.3.x and 2.4.0 from Windows, OSX and
+We have tested with CDH versions 5.4 and 5.5 from Windows, OSX and
 Linux using Java 8.  For the purposes of this document, we assume that
-you have downloaded and installed HDP 2.4 on Hortonworks Sandbox VM from
+you have downloaded and installed CDH 5.5 on Cloudera Sandbox VM from
 [Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox)
+[Cloudera Sandbox Downloads](http://cloudera.com/downloads.html)
 as well as the Oracle JDK 8.
 
 We also assume that the VM is accessible to the machine running
-PostgreSQL with the name **hdp-vm** and that the host running PostgreSQL
-can connect to **hdp-vm** on Hive TCP port 10000.
+PostgreSQL with the name **cdh-vm** and that the host running PostgreSQL
+can connect to **cdh-vm** on Hive TCP port 10000.
 
-### Copy the Hive Client JARs from HDP ###
+### Copy the Hive Client JARs from CDH ###
 
 First, please determine the JAR files that you will need to copy from
-the HDP VM.
+the CDH VM.
 
-Connect to the VM using SSH per Hortonworks instructions:
-
-```bash
-ssh -p 2222 root@localhost
-```
-
-Next, run the command`hadoop classpath` as the hive user to find the
-root directory containing the hadoop JAR files (`/usr/hdp/2.4.0.0-169`):
+Connect to the VM using SSH as per the following instructions:
 
 ```bash
-[root@sandbox ~]# su - hive
-[hive@sandbox ~]$ hadoop classpath
-/usr/hdp/2.4.0.0-169/hadoop/conf:/usr/hdp/2.4.0.0-169/hadoop/lib/*:/usr/hdp/2.4.0.0-169/hadoop/.//*:
-/usr/hdp/2.4.0.0-169/hadoop-hdfs/./:/usr/hdp/2.4.0.0-169/hadoop-hdfs/lib/*:/usr/hdp/2.4.0.0-169/hado
-op-hdfs/.//*:/usr/hdp/2.4.0.0-169/hadoop-yarn/lib/*:/usr/hdp/2.4.0.0-169/hadoop-yarn/.//*:/usr/hdp/2
-.4.0.0-169/hadoop-mapreduce/lib/*:/usr/hdp/2.4.0.0-169/hadoop-mapreduce/.//*::mysql-connector-java-5
-.1.17.jar:mysql-connector-java-5.1.31-bin.jar:mysql-connector-java.jar:/usr/hdp/2.4.0.0-169/tez/*:/u
-sr/hdp/2.4.0.0-169/tez/lib/*:/usr/hdp/2.4.0.0-169/tez/conf
+ssh -p 22 root@hostname
 ```
 
-The JAR files we need are:
-
-```
-/usr/hdp/2.4.0.0-169/
-    |
-    `--- hadoop/
-         |
-         `--- hadoop-common-2.7.1.2.4.0.0-169.jar
-    |
-    `--- hive/
-         |
-         `--- lib
-              |
-              `--- hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
-```
-
-If you are trying this with a different version of HDP, you can
+JAR files required:
 determine the specific versions of the JAR files by running the `ls`
 commands with the glob patterns shown below:
 
 ```bash
-[hive@sandbox ~]$ ls /usr/hdp/*/hadoop/hadoop-common*[0-9].jar
-/usr/hdp/2.4.0.0-169/hadoop/hadoop-common-2.7.1.2.4.0.0-169.jar
-[hive@sandbox ~]$ ls /usr/hdp/*/hive/lib/hive*jdbc*standalone.jar
-/usr/hdp/2.4.0.0-169/hive/lib/hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
+[hive@sandbox ~]$ ls /usr/lib/hadoop/hadoop-common*[0-9].jar
+/usr/lib/hadoop/hadoop-common-2.6.0-cdh5.5.0.jar
+[hive@sandbox ~]$ ls /usr/lib/hive/lib/hive*jdbc*standalone.jar
+/usr/lib/hive/lib/hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
 Please note that the pattern `hadoop-common*[0-9].jar` precludes the
@@ -95,7 +66,7 @@ import java.sql.Statement;
 
 public class HiveJdbcClient {
 
-    private static final String url      = "jdbc:hive2://hdp-vm:10000";
+    private static final String url      = "jdbc:hive2://cdh-vm:10000";
     private static final String user     = "";
     private static final String password = "";
     private static final String query    = "SHOW DATABASES";
@@ -133,21 +104,21 @@ javac HiveJdbcClient.java
 ### Linux and OS X ###
 
 Assuming that you copied the Hive client JAR files to the directory
-`/opt/hadoop/hdp2.4/hive-client-lib`, run the following command in your
+`/opt/hadoop/cdh-5.5/hive-client-lib`, run the following command in your
 shell to execute the program:
 
 ```sh
-java -cp .:$(echo /opt/hadoop/hdp2.4/hive-client-lib/*.jar | tr ' ' ':') HiveJdbcClient
+java -cp .:$(echo /opt/hadoop/cdh-5.5/hive-client-lib/*.jar | tr ' ' ':') HiveJdbcClient
 ```
 
 ### Windows ###
 
 Assuming that you copied the Hive client JAR files to the directory
-`C:\hdp2.4\hive-client-lib`, run the following command in the Command
+`C:\cdh-5.5\hive-client-lib`, run the following command in the Command
 Prompt to execute the program:
 
 ```bat
-java -cp .;"C:\hdp2.4\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar";"C:\hdp2.4\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar" HiveJdbcClient
+java -cp .;"C:\cdh-5.5\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar";"C:\cdh-5.5\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar" HiveJdbcClient
 ```
 
 ### Confirm Output ###
@@ -194,7 +165,7 @@ for the platform matching that of your PostgreSQL server:
 
 We assume the default PostgreSQL prefix (`/usr/local/pgsql`) on Linux
 and that the Hive client JAR files were copied under the directory
-`/opt/hadoop/hdp2.4/hive-client-lib`.
+`/opt/hadoop/cdh-5.5/hive-client-lib`.
 
 Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
 run in a shell:
@@ -208,7 +179,7 @@ example, we are using bash:
 
 ```bash
 export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/hdp2.4/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/cdh-5.5/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
@@ -218,7 +189,7 @@ up the variables we set up.
 
 We assume that PostgreSQL is installed in `C:\msys2-x64\usr\local\pgsql`
 and that the Hive client JAR files were copied under the directory
-`C:\hdp2.4\hive-client-lib`.
+`C:\cdh-5.5\hive-client-lib`.
 
 Add your JDK's `bin` and `jre\bin\server` directories to the PATH
 environment variable.  Assuming the Java install location of
@@ -235,7 +206,7 @@ Next, in the Command Prompt, set up the requisite environment variables.
 
 ```bat
 set PGHOME=C:\msys2-x64\usr\local\pgsql
-set HADOOP_JDBC_CLASSPATH=C:\hdp2.4\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hdp2.4\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
+set HADOOP_JDBC_CLASSPATH=C:\cdh-5.5\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\cdh-5.5\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
 Then start the PostgreSQL server from this Command Prompt to have the
@@ -252,7 +223,7 @@ the Oracle JDK.**
 
 We assume the PostgreSQL prefix (`/usr/local/pgsql`) and that the Hive
 client JAR files were copied under the directory
-`/opt/hadoop/hdp2.4/hive-client-lib`.
+`/opt/hadoop/cdh-5.5/hive-client-lib`.
 
 Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
 run in a shell:
@@ -266,13 +237,13 @@ example, we are using bash:
 
 ```bash
 export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/hdp2.4/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/cdh-5.5/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
 up the variables we set up.
 
-## Use with an HDP Sample TABLE ##
+## Use with an CDH Sample TABLE ##
 
 The sample TABLE `sample_07` ships as part of the HDP Sandbox VM.  We
 show you how to access it from psql as superuser below:
@@ -282,7 +253,7 @@ show you how to access it from psql as superuser below:
 CREATE EXTENSION hadoop_fdw;
 
 CREATE SERVER hadoop_server FOREIGN DATA WRAPPER hadoop_fdw
-  OPTIONS (HOST 'hdp-vm', PORT '10000');
+  OPTIONS (HOST 'cdh-vm', PORT '10000');
 
 CREATE USER MAPPING FOR PUBLIC SERVER hadoop_server;
 
