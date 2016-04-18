@@ -17,7 +17,7 @@ and Linux using Java 8.  For this document, we assume that you have
 downloaded and installed one of the following VMs:
 
 - *CDH 5.5 Quickstart VM*
-  (from [Cloudera Quickstart Downloads](www.cloudera.com/downloads/quickstart_vms.html))
+  (from [Cloudera Quickstart Downloads](http://www.cloudera.com/downloads/quickstart_vms.html))
 
 - *HDP 2.4 on Hortonworks Sandbox VM*
   (from [Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox))
