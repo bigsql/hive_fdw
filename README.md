@@ -123,7 +123,7 @@ import java.sql.Statement;
 
 public class HiveJdbcClient {
 
-    private static final String url      = "jdbc:hive2://sandbox-vm:10000";
+    private static final String url      = "jdbc:hive2://hadoop-vm:10000";
     private static final String user     = "";
     private static final String password = "";
     private static final String query    = "SHOW DATABASES";
@@ -342,7 +342,7 @@ we show you how to access it from psql as superuser:
 CREATE EXTENSION hadoop_fdw;
 
 CREATE SERVER hadoop_server FOREIGN DATA WRAPPER hadoop_fdw
-  OPTIONS (HOST 'sandbox-vm', PORT '10000');
+  OPTIONS (HOST 'hadoop-vm', PORT '10000');
 
 CREATE USER MAPPING FOR PUBLIC SERVER hadoop_server;
 
