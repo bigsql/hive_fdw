@@ -32,26 +32,28 @@ Last, we assume that the host running PostgreSQL has JDK 8 installed.
 ### Copy the Hive Client JARs ###
 
 First, please determine the JAR files that you will need to copy from
-the CDH VM Or HDP VM
+the Hadoop VM.
 
-Connect to the VM using SSH as per the following instructions:
+Connect to the VM using SSH from the PostgreSQL host:
 
 ```bash
-ssh -p 22 root@hostname
+ssh -p 22 root@hadoop-vm
 ```
 ## JAR files for CDH ##
 
-determine the specific versions of the JAR files by running the `ls`
+Determine the specific versions of the JAR files by running the `ls`
 commands with the glob patterns shown below:
 
 ```bash
 [hive@sandbox ~]$ ls /usr/lib/hadoop/hadoop-common*[0-9].jar
 /usr/lib/hadoop/hadoop-common-2.6.0-cdh5.5.0.jar
-[hive@sandbox ~]$ ls /usr/lib/hive/lib/hive*jdbc*standalone.jar
+[hive@sandbox ~]$ ls /usr/lib/hive/lib/hive*jdbc*[0-9]*standalone.jar
 /usr/lib/hive/lib/hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
+
 Please note that the pattern `hadoop-common*[0-9].jar` precludes the
-file `hadoop-common*-test.jar` from appearing.
+file `hadoop-common*-test.jar` from appearing and that the second
+pattern precludes the symlink `hive-jdbc-standalone.jar` from appearing.
 
 Once you have the paths for the two JAR files, SCP them to a directory
 `hive-client-lib` on the PostgreSQL host that you are installing the
@@ -59,8 +61,8 @@ Hadoop FDW on.
 
 ## JAR files for HDP ##
 
-run the command`hadoop classpath` as the hive user to find the
-root directory containing the hadoop JAR files (`/usr/hdp/2.4.0.0-169`):
+Run the command `hadoop classpath` as the hive user to find the root
+directory containing the hadoop JAR files (`/usr/hdp/2.4.0.0-169`):
 
 ```bash
 [root@sandbox ~]# su - hive
