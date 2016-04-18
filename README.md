@@ -12,23 +12,20 @@ Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 ## Pre-Requisites ##
 
-## For CDH Cloudera Sandbox VM ##
-We have tested with CDH versions 5.4 and 5.5 from Windows, OSX and
-Linux using Java 8.  For the purposes of this document, we assume that
-you have downloaded and installed CDH 5.5 on Cloudera Sandbox VM from
-[Cloudera Sandbox Downloads](http://cloudera.com/downloads.html)
-as well as the Oracle JDK 8.
+Our latest testing has been with CDH 5.5 and HDP 2.4 from Windows, OSX
+and Linux using Java 8.  For this document, we assume that you have
+downloaded and installed Oracle JDK 8 and one of the following VMs:
 
-## For HDP Hortonworks Sandbox VM ##
-We have tested with HDP versions 2.3.x and 2.4.0 from Windows, OSX and 
-Linux using Java 8. For the purposes of this document, we assume that 
-you have downloaded and installed HDP 2.4 on Hortonworks Sandbox VM from 
-[Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox)
-as well as the Oracle JDK 8.
+- *CDH 5.5 Quickstart VM*
+  (from [Cloudera Quickstart Downloads](www.cloudera.com/downloads/quickstart_vms.html))
 
-We also assume that the VM is accessible to the machine running 
-PostgreSQL with the name **sandbox-vm** and that the host running PostgreSQL 
-can connect to **sandbox-vm** on Hive TCP port 10000.
+- *HDP 2.4 on Hortonworks Sandbox VM*
+  (from [Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox))
+
+We also assume that your Hadoop VM is accessible to the machine running
+PostgreSQL with the name **hadoop-vm** and that the host running
+PostgreSQL can connect to **hadoop-vm** on Hive TCP port 10000 and on
+SSH TCP port 22.
 
 ### Copy the Hive Client JARs ###
 
