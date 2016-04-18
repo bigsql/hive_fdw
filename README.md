@@ -1,5 +1,5 @@
-Using HADOOP-FDW with a Cloudera CDH Sandbox VM and Hortonworks HDP Sandbox VM
-========================================
+Using HADOOP-FDW with a Hadoop Sandbox VM
+=========================================
 
 ## Overview ##
 
