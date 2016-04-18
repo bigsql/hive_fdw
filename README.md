@@ -331,10 +331,11 @@ export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/hive-client-lib/*.jar | tr 
 Then start the PostgreSQL server from this shell to have the server pick
 up the variables we set up.
 
-## Use case with Sample TABLE ##
+## Use with Sample TABLE ##
 
-The sample TABLE `sample_07` ships as part of the HDP Sandbox VM.  We
-show you how to access it from psql as superuser below:
+The sample TABLE `sample_07` ships as part of the HDP Sandbox VM.  If
+you are using CDH, we assume you have created a similar table.  Below,
+we show you how to access it from psql as superuser:
 
 ```sql
 
