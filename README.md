@@ -14,7 +14,7 @@ Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 Our latest testing has been with CDH 5.5 and HDP 2.4 from Windows, OSX
 and Linux using Java 8.  For this document, we assume that you have
-downloaded and installed Oracle JDK 8 and one of the following VMs:
+downloaded and installed one of the following VMs:
 
 - *CDH 5.5 Quickstart VM*
   (from [Cloudera Quickstart Downloads](www.cloudera.com/downloads/quickstart_vms.html))
@@ -24,8 +24,9 @@ downloaded and installed Oracle JDK 8 and one of the following VMs:
 
 We also assume that your Hadoop VM is accessible to the machine running
 PostgreSQL with the name **hadoop-vm** and that the host running
-PostgreSQL can connect to **hadoop-vm** on Hive TCP port 10000 and on
-SSH TCP port 22.
+PostgreSQL can connect to **hadoop-vm** on Hive TCP port 10000 as well
+as SSH TCP port 22.  Last, we assume that the host running PostgreSQL
+has JDK 8 installed.
 
 ### Copy the Hive Client JARs ###
 
