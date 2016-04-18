@@ -37,7 +37,7 @@ the Hadoop VM.
 Connect to the VM using SSH from the PostgreSQL host:
 
 ```bash
-ssh -p 22 root@hadoop-vm
+ssh root@hadoop-vm
 ```
 ## JAR files for CDH ##
 
@@ -334,7 +334,7 @@ up the variables we set up.
 ## Use with Sample TABLE ##
 
 The sample TABLE `sample_07` ships as part of the HDP Sandbox VM.  If
-you are using CDH, we assume you have created a similar table.  Below,
+you are using CDH, we assume you have created a similar TABLE.  Below,
 we show you how to access it from psql as superuser:
 
 ```sql
