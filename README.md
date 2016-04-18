@@ -7,8 +7,8 @@ This HadoopFDW extension is built into the Windows, OSX & Linux
 distributions of [PostgreSQL by BigSQL](http://bigsql.org).  It allows
 access to Hive tables from PostgreSQL.
 
-This document elucidates the steps needed to run it against *CDH 5.5 on
-Cloudera Sandbox VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
+This document elucidates the steps needed to run it against *CDH 5.5
+Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 ## Pre-Requisites ##
 
