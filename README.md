@@ -258,7 +258,7 @@ example, we are using bash:
 
 ```bash
 export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_JDBC_CLASSPATH=$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
@@ -325,7 +325,7 @@ example, we are using bash:
 
 ```bash
 export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$PWD:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_JDBC_CLASSPATH=$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
