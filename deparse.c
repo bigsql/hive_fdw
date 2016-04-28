@@ -681,7 +681,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 								appendStringInfo(buf, "(%s)", extval);
 							else
 								appendStringInfoString(buf, extval);
-							if (strcspn(extval, "eE.") != strlen(extval))
 						}
 						else
 							appendStringInfo(buf, "'%s'", extval);
