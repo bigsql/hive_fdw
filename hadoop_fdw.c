@@ -13,6 +13,8 @@
 
 #include "postgres.h"
 
+#include "hadoop_fdw.h"
+
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -23,6 +25,8 @@
 #include "catalog/pg_foreign_table.h"
 #include "catalog/pg_user_mapping.h"
 #include "catalog/pg_type.h"
+#include "optimizer/var.h"
+#include "utils/guc.h"
 #include "commands/defrem.h"
 #include "commands/explain.h"
 #include "foreign/fdwapi.h"
