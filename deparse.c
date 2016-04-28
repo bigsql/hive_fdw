@@ -596,7 +596,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 	Oid			typoutput;
 	bool		typIsVarlena;
 	char	   *extval;
-	bool		isfloat = false;
 	bool		iterate = false, isarray = false;
 	Oid			iterator_result_type, field_type;
 	Datum		value;
@@ -683,7 +682,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 							else
 								appendStringInfoString(buf, extval);
 							if (strcspn(extval, "eE.") != strlen(extval))
-								isfloat = true; /* it looks like a float */
 						}
 						else
 							appendStringInfo(buf, "'%s'", extval);
