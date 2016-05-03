@@ -52,6 +52,12 @@
 #define StrValue(arg) Str(arg)
 #define STR_PKGLIBDIR StrValue(PKG_LIB_DIR)
 
+#if PG_VERSION_NUM >= 90500
+#define HADOOP_FDW_IMPORT_API
+#else
+#undef HADOOP_FDW_IMPORT_API
+#endif  /* PG_VERSION_NUM >= 90500 */
+
 
 PG_MODULE_MAGIC;
 
@@ -95,6 +101,20 @@ static struct hadoopFdwOption valid_options[] =
 	{NULL, InvalidOid}
 };
 
+typedef struct hadoopFdwRelationInfo
+{
+	/* baserestrictinfo clauses, broken down into safe and unsafe subsets. */
+	List       *remote_conds;
+	List       *local_conds;
+
+	/* Bitmap of attr numbers we need to fetch from the remote server. */
+	Bitmapset  *attrs_used;
+
+	/* Cached catalog information. */
+	ForeignTable *table;
+	ForeignServer *server;
+} hadoopFdwRelationInfo;
+
 /*
  * FDW-specific information for ForeignScanState.fdw_state.
  */
@@ -103,9 +123,9 @@ typedef struct hadoopFdwExecutionState
 {
 	char	   *query;
 	int			NumberOfRows;
-	jobject		java_call;
 	int			NumberOfColumns;
-}	hadoopFdwExecutionState;
+	List	   *retrieved_attrs;	/* list of retrieved attribute numbers */
+} hadoopFdwExecutionState;
 
 /*
  * SQL functions
@@ -145,24 +165,36 @@ static void hadoopBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hadoopIterateForeignScan(ForeignScanState *node);
 static void hadoopReScanForeignScan(ForeignScanState *node);
 static void hadoopEndForeignScan(ForeignScanState *node);
+#ifdef HADOOP_FDW_IMPORT_API
+static List *hadoopImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serverOid);
+#endif  /* HADOOP_FDW_IMPORT_API */
+static hadoopFdwExecutionState *hadoopGetConnection(
+				char *svr_username,
+				char *svr_password,
+				char *svr_host,
+				int svr_port,
+				char *svr_schema);
 
 /*
  * Helper functions
  */
 static bool hadoopIsValidOption(const char *option, Oid context);
 static void
-hadoopGetOptions(
-				 Oid foreigntableid,
-				 int *querytimeout,
-				 int *maxheapsize,
-				 char **username,
-				 char **password,
-				 char **query,
-				 char **table,
-				 char **host,
-				 int *port,
-				 char **schema
-);
+hadoopGetServerOptions(
+					   Oid serveroid,
+					   int *querytimeout,
+					   int *maxheapsize,
+					   char **username,
+					   char **password,
+					   char **query,
+					   char **host,
+					   int *port);
+
+static void hadoopGetTableOptions(
+					  Oid foreigntableid,
+					  char **table,
+					  char **schema);
+
 
 /*
  * Uses a String object's content to create an instance of C String
@@ -278,7 +310,7 @@ DestroyJVM()
  *
  */
 static void
-JVMInitialization(Oid foreigntableid)
+JVMInitialization(Oid serveroid)
 {
 	jint		res = -5;		/* Initializing the value of res so that we
 								 * can check it later to see whether JVM has
@@ -292,9 +324,7 @@ JVMInitialization(Oid foreigntableid)
 	char	   *svr_username = NULL;
 	char	   *svr_password = NULL;
 	char	   *svr_query = NULL;
-	char	   *svr_table = NULL;
 	char	   *svr_host = NULL;
-	char	   *svr_schema = NULL;
 	int			svr_port = 0;
 	char	   *maxheapsizeoption = NULL;
 	int			svr_querytimeout = 0;
@@ -303,18 +333,18 @@ JVMInitialization(Oid foreigntableid)
 	char	   *var_PGHOME = NULL;
 	int			cp_len = 0;
 
-	hadoopGetOptions(
-					 foreigntableid,
-					 &svr_querytimeout,
-					 &svr_maxheapsize,
-					 &svr_username,
-					 &svr_password,
-					 &svr_query,
-					 &svr_table,
-					 &svr_host,
-					 &svr_port,
-					 &svr_schema
+	hadoopGetServerOptions(
+						   serveroid,
+						   &svr_querytimeout,
+						   &svr_maxheapsize,
+						   &svr_username,
+						   &svr_password,
+						   &svr_query,
+						   &svr_host,
+						   &svr_port
 		);
+
+
 
 	SIGINTInterruptCheckProcess();
 
@@ -417,6 +447,9 @@ hadoop_fdw_handler(PG_FUNCTION_ARGS)
 	fdwroutine->IterateForeignScan = hadoopIterateForeignScan;
 	fdwroutine->ReScanForeignScan = hadoopReScanForeignScan;
 	fdwroutine->EndForeignScan = hadoopEndForeignScan;
+#ifdef HADOOP_FDW_IMPORT_API
+	fdwroutine->ImportForeignSchema = hadoopImportForeignSchema;
+#endif  /* HADOOP_FDW_IMPORT_API */
 
 	pqsignal(SIGINT, SIGINTInterruptHandler);
 
@@ -661,9 +694,39 @@ hadoopIsValidOption(const char *option, Oid context)
  * Fetch the options for a hadoop_fdw foreign table.
  */
 static void
-hadoopGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **table, char **host, int *port, char **schema)
+hadoopGetTableOptions(Oid foreigntableid, char **table, char **schema)
 {
 	ForeignTable *f_table;
+	List	   *options;
+	ListCell   *lc;
+
+	f_table = GetForeignTable(foreigntableid);
+
+	options = NIL;
+	options = list_concat(options, f_table->options);
+
+	/* Loop through the options, and get the server/port */
+	foreach(lc, options)
+	{
+		DefElem    *def = (DefElem *) lfirst(lc);
+
+		if (strcmp(def->defname, "table") == 0)
+		{
+			*table = defGetString(def);
+		}
+		if (strcmp(def->defname, "schema") == 0)
+		{
+			*schema = defGetString(def);
+		}
+	}
+}
+
+/*
+ * Fetch the options for the hadoop_fdw foreign server.
+ */
+static void
+hadoopGetServerOptions(Oid serveroid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **host, int *port)
+{
 	ForeignServer *f_server;
 	UserMapping *f_mapping;
 	List	   *options;
@@ -672,12 +735,10 @@ hadoopGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char *
 	/*
 	 * Extract options from FDW objects.
 	 */
-	f_table = GetForeignTable(foreigntableid);
-	f_server = GetForeignServer(f_table->serverid);
-	f_mapping = GetUserMapping(GetUserId(), f_table->serverid);
+	f_server = GetForeignServer(serveroid);
+	f_mapping = GetUserMapping(GetUserId(), serveroid);
 
 	options = NIL;
-	options = list_concat(options, f_table->options);
 	options = list_concat(options, f_server->options);
 	options = list_concat(options, f_mapping->options);
 
@@ -686,35 +747,6 @@ hadoopGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char *
 	{
 		DefElem    *def = (DefElem *) lfirst(lc);
 
-		if (strcmp(def->defname, "username") == 0)
-		{
-			*username = defGetString(def);
-		}
-
-		if (strcmp(def->defname, "querytimeout") == 0)
-		{
-			*querytimeout = atoi(defGetString(def));
-		}
-
-		if (strcmp(def->defname, "maxheapsize") == 0)
-		{
-			*maxheapsize = atoi(defGetString(def));
-		}
-
-		if (strcmp(def->defname, "password") == 0)
-		{
-			*password = defGetString(def);
-		}
-
-		if (strcmp(def->defname, "query") == 0)
-		{
-			*query = defGetString(def);
-		}
-
-		if (strcmp(def->defname, "table") == 0)
-		{
-			*table = defGetString(def);
-		}
 		if (strcmp(def->defname, "host") == 0)
 		{
 			*host = defGetString(def);
@@ -723,14 +755,28 @@ hadoopGetOptions(Oid foreigntableid, int *querytimeout, int *maxheapsize, char *
 		{
 			*port = atoi(defGetString(def));
 		}
-		if (strcmp(def->defname, "schema") == 0)
+		if (strcmp(def->defname, "username") == 0)
 		{
-			*schema = defGetString(def);
+			*username = defGetString(def);
 		}
-
+		if (strcmp(def->defname, "querytimeout") == 0)
+		{
+			*querytimeout = atoi(defGetString(def));
+		}
+		if (strcmp(def->defname, "maxheapsize") == 0)
+		{
+			*maxheapsize = atoi(defGetString(def));
+		}
+		if (strcmp(def->defname, "password") == 0)
+		{
+			*password = defGetString(def);
+		}
+		if (strcmp(def->defname, "query") == 0)
+		{
+			*query = defGetString(def);
+		}
 	}
 }
-
 #if (PG_VERSION_NUM < 90200)
 /*
  * hadoopPlanForeignScan
@@ -753,26 +799,27 @@ hadoopPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel
 	char	   *query;
 	char	   *svr_host = NULL;
 	int			svr_port = 0;
+	ForeignTable *f_table = NULL;
 
 	SIGINTInterruptCheckProcess();
 
+	f_table = GetForeignTable(foreigntableid);
+	JVMInitialization(f_table->serverid);
+
 	fdwplan = makeNode(FdwPlan);
 
-	JVMInitialization(foreigntableid);
-
 	/* Fetch options */
-	hadoopGetOptions(
-					 foreigntableid,
-					 &svr_querytimeout,
-					 &svr_maxheapsize,
-					 &svr_username,
-					 &svr_password,
-					 &svr_query,
-					 &svr_table,
-					 &svr_host,
-					 &svr_port,
-					 &svr_schema
+	hadoopGetServerOptions(
+						   f_table->serverid,
+						   &svr_querytimeout,
+						   &svr_maxheapsize,
+						   &svr_username,
+						   &svr_password,
+						   &svr_query,
+						   &svr_host,
+						   &svr_port
 		);
+	hadoopGetTableOptions(foreigntableid, &svr_table, &svr_schema);
 	/* Build the query */
 	if (svr_query)
 	{
@@ -803,25 +850,24 @@ hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 	char	   *svr_username = NULL;
 	char	   *svr_password = NULL;
 	char	   *svr_query = NULL;
-	char	   *svr_table = NULL;
-	char	   *svr_schema = NULL;
 	int			svr_querytimeout = 0;
 	int			svr_maxheapsize = 0;
 	char	   *svr_host = NULL;
 	int			svr_port = 0;
+	ForeignTable *f_table = NULL;
+
+	f_table = GetForeignTable(RelationGetRelid(node->ss.ss_currentRelation));
 
 	/* Fetch options  */
-	hadoopGetOptions(
-					 RelationGetRelid(node->ss.ss_currentRelation),
-					 &svr_querytimeout,
-					 &svr_maxheapsize,
-					 &svr_username,
-					 &svr_password,
-					 &svr_query,
-					 &svr_table,
-					 &svr_host,
-					 &svr_port,
-					 &svr_schema
+	hadoopGetServerOptions(
+						   f_table->serverid,
+						   &svr_querytimeout,
+						   &svr_maxheapsize,
+						   &svr_username,
+						   &svr_password,
+						   &svr_query,
+						   &svr_host,
+						   &svr_port
 		);
 
 	SIGINTInterruptCheckProcess();
@@ -834,7 +880,6 @@ hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 static void
 hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 {
-	char	   *svr_url = NULL;
 	char	   *svr_username = NULL;
 	char	   *svr_password = NULL;
 	char	   *svr_query = NULL;
@@ -845,80 +890,47 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 	hadoopFdwExecutionState *festate;
 	char	   *query;
 	jclass		HadoopJDBCUtilsClass;
-	jclass		JavaString;
-	jstring		StringArray[7];
 	jstring		initialize_result = NULL;
 	jmethodID	id_initialize;
-	jobjectArray arg_array;
-	int			counter = 0;
-	int			referencedeletecounter = 0;
 	jfieldID	id_numberofcolumns;
-	char	   *querytimeoutstr = NULL;
-	char	   *jar_classpath;
 	char	   *initialize_result_cstring = NULL;
-	char	   *var_CP = NULL;
-	int			cp_len = 0;
 	char	   *svr_host = NULL;
 	int			svr_port = 0;
-	char	   *portstr = NULL;
+	Oid			foreigntableid;
+	ForeignTable *f_table = NULL;
+	jstring		name;
+
+	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
+
+	elog(DEBUG2, "Start: hadoopBeginForeignScan");
 
 	SIGINTInterruptCheckProcess();
 
 	/* Fetch options  */
-	hadoopGetOptions(
-					 RelationGetRelid(node->ss.ss_currentRelation),
-					 &svr_querytimeout,
-					 &svr_maxheapsize,
-					 &svr_username,
-					 &svr_password,
-					 &svr_query,
-					 &svr_table,
-					 &svr_host,
-					 &svr_port,
-					 &svr_schema
+	foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+	f_table = GetForeignTable(foreigntableid);
+
+	hadoopGetTableOptions(foreigntableid, &svr_table, &svr_schema);
+	hadoopGetServerOptions(f_table->serverid,
+						   &svr_querytimeout,
+						   &svr_maxheapsize,
+						   &svr_username,
+						   &svr_password,
+						   &svr_query,
+						   &svr_host,
+						   &svr_port
 		);
 
-	/* Set the options for JNI */
-	var_CP = getenv("HADOOP_JDBC_CLASSPATH");
-	cp_len = strlen(var_CP) + 2;
-	jar_classpath = (char *) palloc(cp_len);
-	snprintf(jar_classpath, (cp_len + 1), "%s", var_CP);
+	festate = hadoopGetConnection(svr_username, svr_password, svr_host, svr_port, svr_schema);
 
-	portstr = (char *) palloc(sizeof(int));
-	snprintf(portstr, sizeof(int), "%d", svr_port);
+	query = strVal(list_nth(fsplan->fdw_private, 0));
 
-	if (svr_schema)
-	{
-		cp_len = strlen(svr_schema) + strlen(svr_host) + sizeof(int) + 30;
-		svr_url = (char *) palloc(cp_len);
-		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/%s", svr_host, svr_port, svr_schema);
-	}
-	else
-	{
-		cp_len = strlen(svr_host) + sizeof(int) + 30;
-		svr_url = (char *) palloc(cp_len);
-		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/default", svr_host, svr_port);
-	}
+	elog(DEBUG1, "hadoop_fdw: Starting Query: %s", query);
 
-	querytimeoutstr = (char *) palloc(sizeof(int));
-	snprintf(querytimeoutstr, sizeof(int), "%d", svr_querytimeout);
-
-	/* Build the query */
-	if (svr_query != NULL)
-	{
-		query = svr_query;
-	}
-	else
-	{
-		size_t		len = strlen(svr_table) + 15;
-
-		query = (char *) palloc(len);
-		snprintf(query, len, "SELECT * FROM %s", svr_table);
-	}
-
-	/* Stash away the state info we have already */
-	festate = (hadoopFdwExecutionState *) palloc(sizeof(hadoopFdwExecutionState));
+	node->fdw_state = (void *) festate;
+/*	festate->result = NULL; */
 	festate->query = query;
+	festate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private, 1);
 	festate->NumberOfColumns = 0;
 	festate->NumberOfRows = 0;
 
@@ -929,7 +941,7 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
 	}
 
-	id_initialize = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "Initialize", "([Ljava/lang/String;)Ljava/lang/String;");
+	id_initialize = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "Execute_Query", "(Ljava/lang/String;)Ljava/lang/String;");
 	if (id_initialize == NULL)
 	{
 		elog(ERROR, "id_initialize is NULL");
@@ -941,46 +953,13 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 		elog(ERROR, "id_numberofcolumns is NULL");
 	}
 
-	if (svr_username == NULL)
-	{
-		svr_username = "";
-	}
-
-	if (svr_password == NULL)
-	{
-		svr_password = "";
-	}
-
-	StringArray[0] = (*env)->NewStringUTF(env, (festate->query));
-	StringArray[1] = (*env)->NewStringUTF(env, "org.apache.hive.jdbc.HiveDriver");
-	StringArray[2] = (*env)->NewStringUTF(env, svr_url);
-	StringArray[3] = (*env)->NewStringUTF(env, svr_username);
-	StringArray[4] = (*env)->NewStringUTF(env, svr_password);
-	StringArray[5] = (*env)->NewStringUTF(env, querytimeoutstr);
-	StringArray[6] = (*env)->NewStringUTF(env, jar_classpath);
-
-	JavaString = (*env)->FindClass(env, "java/lang/String");
-
-	arg_array = (*env)->NewObjectArray(env, 7, JavaString, StringArray[0]);
-	if (arg_array == NULL)
-	{
-		elog(ERROR, "arg_array is NULL");
-	}
-
-	for (counter = 1; counter < 7; counter++)
-	{
-		(*env)->SetObjectArrayElement(env, arg_array, counter, StringArray[counter]);
-	}
-
-	java_call = (*env)->AllocObject(env, HadoopJDBCUtilsClass);
 	if (java_call == NULL)
 	{
 		elog(ERROR, "java_call is NULL");
 	}
 
-	festate->java_call = java_call;
-
-	initialize_result = (*env)->CallObjectMethod(env, java_call, id_initialize, arg_array);
+	name = (*env)->NewStringUTF(env, query);
+	initialize_result = (*env)->CallObjectMethod(env, java_call, id_initialize, name);
 	if (initialize_result != NULL)
 	{
 		initialize_result_cstring = ConvertStringToCString((jobject) initialize_result);
@@ -989,15 +968,6 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 
 	node->fdw_state = (void *) festate;
 	festate->NumberOfColumns = (*env)->GetIntField(env, java_call, id_numberofcolumns);
-
-	for (referencedeletecounter = 0; referencedeletecounter < 7; referencedeletecounter++)
-	{
-		(*env)->DeleteLocalRef(env, StringArray[referencedeletecounter]);
-	}
-
-	(*env)->DeleteLocalRef(env, arg_array);
-	(*env)->ReleaseStringUTFChars(env, initialize_result, initialize_result_cstring);
-	(*env)->DeleteLocalRef(env, initialize_result);
 }
 
 /*
@@ -1018,7 +988,6 @@ hadoopIterateForeignScan(ForeignScanState *node)
 	jstring		tempString;
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
-	jobject		java_call = festate->java_call;
 
 	/* Cleanup */
 	ExecClearTuple(slot);
@@ -1087,7 +1056,6 @@ hadoopEndForeignScan(ForeignScanState *node)
 	jstring		close_result = NULL;
 	char	   *close_result_cstring = NULL;
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
-	jobject		java_call = festate->java_call;
 
 	SIGINTInterruptCheckProcess();
 
@@ -1163,16 +1131,103 @@ hadoopGetForeignPlan(PlannerInfo *root,
 #endif   /* PG_VERSION_NUM >= 90500 */
 )
 {
+	/*
+	 * Create a ForeignScan plan node from the selected foreign access path.
+	 * This is called at the end of query planning. The parameters are as for
+	 * GetForeignRelSize, plus the selected ForeignPath (previously produced
+	 * by GetForeignPaths), the target list to be emitted by the plan node,
+	 * and the restriction clauses to be enforced by the plan node.
+	 *
+	 * This function must create and return a ForeignScan plan node; it's
+	 * recommended to use make_foreignscan to build the ForeignScan node.
+	 *
+	 */
+	List	   *fdw_private;
+	List	   *remote_conds = NIL;
+	List	   *local_exprs = NIL;
+	List	   *params_list = NIL;
+	List	   *retrieved_attrs;
+	StringInfoData sql;
+	ListCell   *lc;
+
+	ForeignTable *table;
+	Relation	rel;
+	const char *relname = NULL;
 	Index		scan_relid = baserel->relid;
+	ForeignTable *f_table;
 
-	SIGINTInterruptCheckProcess();
+	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) baserel->fdw_private;
 
-	JVMInitialization(foreigntableid);
+	elog(DEBUG2, "Start: hadoopGetForeignPlan");
 
-	scan_clauses = extract_actual_clauses(scan_clauses, false);
+	f_table = GetForeignTable(foreigntableid);
+	JVMInitialization(f_table->serverid);
+
+	foreach(lc, scan_clauses)
+	{
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
+
+		Assert(IsA(rinfo, RestrictInfo));
+
+		/* Ignore any pseudoconstants, they're dealt with elsewhere */
+		if (rinfo->pseudoconstant)
+			continue;
+
+		if (list_member_ptr(fpinfo->remote_conds, rinfo))
+		{
+			remote_conds = lappend(remote_conds, rinfo);
+		}
+		else if (list_member_ptr(fpinfo->local_conds, rinfo))
+			local_exprs = lappend(local_exprs, rinfo->clause);
+		else
+		{
+			Assert(is_foreign_expr(root, baserel, rinfo->clause));
+			remote_conds = lappend(remote_conds, rinfo);
+		}
+	}
+
+	/*
+	 * Build the query string to be sent for execution, and identify
+	 * expressions to be sent as parameters.
+	 */
+	initStringInfo(&sql);
+
+	deparseSelectSql(&sql, root, baserel, fpinfo->attrs_used,
+					 &retrieved_attrs);
+	appendStringInfo(&sql, "%s", " FROM ");
+
+	rel = heap_open(foreigntableid, NoLock);
+	table = GetForeignTable(RelationGetRelid(rel));
+
+	/*
+	 * Use value of FDW options if any, instead of the name of object itself.
+	 */
+	foreach(lc, table->options)
+	{
+		DefElem    *def = (DefElem *) lfirst(lc);
+
+		if (strcmp(def->defname, "table") == 0)
+			relname = defGetString(def);
+	}
+
+	appendStringInfo(&sql, "%s", relname);
+	if (remote_conds)
+		appendWhereClause(&sql, root, baserel, remote_conds,
+						  true, &params_list);
+
+	fdw_private = list_make2(makeString(sql.data),
+							 retrieved_attrs);
+
+	heap_close(rel, NoLock);
 
 	/* Create the ForeignScan node */
-	return (make_foreignscan(tlist, scan_clauses, scan_relid, NIL, NIL, NULL, NULL, NULL));
+#if PG_VERSION_NUM >= 90500
+	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private, NIL, NIL, (Plan *) NIL);
+#else
+	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private);
+#endif
+
+	elog(DEBUG2, "End: hadoopGetForeignPlan");
 }
 
 /*
@@ -1182,6 +1237,301 @@ hadoopGetForeignPlan(PlannerInfo *root,
 static void
 hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
+	hadoopFdwRelationInfo *fpinfo;
+	ListCell   *lc;
+
 	SIGINTInterruptCheckProcess();
+
+	elog(DEBUG2, "Start: hadoopGetForeignRelSize");
+
+	baserel->rows = 1000;
+
+	fpinfo = (hadoopFdwRelationInfo *) palloc0(sizeof(hadoopFdwRelationInfo));
+	baserel->fdw_private = (void *) fpinfo;
+
+	/* Look up foreign-table catalog info. */
+	fpinfo->table = GetForeignTable(foreigntableid);
+	fpinfo->server = GetForeignServer(fpinfo->table->serverid);
+
+	foreach(lc, baserel->baserestrictinfo)
+	{
+		RestrictInfo *ri = (RestrictInfo *) lfirst(lc);
+
+		if (is_foreign_expr(root, baserel, ri->clause))
+			fpinfo->remote_conds = lappend(fpinfo->remote_conds, ri);
+		else
+			fpinfo->local_conds = lappend(fpinfo->local_conds, ri);
+	}
+
+	/*
+	 * Identify which attributes will need to be retrieved from the remote
+	 * server.  These include all attrs needed for joins or final output, plus
+	 * all attrs used in the local_conds.
+	 *
+	 * In cases where there is a small amount of data, and we don't send
+	 * hadoop a WHERE clause, we should also do a SELECT *. And that happens
+	 * when attrs_used remains NULL for the local execution case below
+	 */
+	fpinfo->attrs_used = NULL;
+
+	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid,
+				   &fpinfo->attrs_used);
+	foreach(lc, fpinfo->local_conds)
+	{
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
+
+		pull_varattnos((Node *) rinfo->clause, baserel->relid,
+					   &fpinfo->attrs_used);
+	}
+
+	elog(DEBUG2, "End: hadoopGetForeignRelSize");
 }
 #endif
+
+#ifdef HADOOP_FDW_IMPORT_API
+/*
+ ** hadoopImportForeignSchema
+ ** Generates CREATE FOREIGN TABLE statements for each of the tables
+ ** in the source schema and returns the list of these statements
+ ** to the caller.
+ **/
+
+static List *
+hadoopImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
+{
+	ForeignServer *server;
+	List	   *result = NIL;
+	char	   *svr_username = NULL;
+	char	   *svr_password = NULL;
+	char	   *svr_query = NULL;
+	int			svr_querytimeout = 0;
+	int			svr_maxheapsize = 0;
+	jclass		HadoopJDBCUtilsClass;
+	jstring		initialize_result = NULL;
+	jmethodID	id_initialize;
+	jfieldID	id_numberofrows;
+	char	   *initialize_result_cstring = NULL;
+	char	   *svr_host = NULL;
+	int			svr_port = 0;
+	char	  **values;
+	jmethodID	id_returnresultset;
+	jobjectArray java_rowarray;
+	int			i = 0;
+	int			j = 0;
+	jstring		tempString;
+	int			NumberOfRows = 4;
+	jstring		schemaname;
+	jstring		servername;
+
+
+	StringInfoData buf;
+
+	initStringInfo(&buf);
+
+	SIGINTInterruptCheckProcess();
+
+
+	JVMInitialization(serveroid);
+
+	hadoopGetServerOptions(
+						   serveroid,
+						   &svr_querytimeout,
+						   &svr_maxheapsize,
+						   &svr_username,
+						   &svr_password,
+						   &svr_query,
+						   &svr_host,
+						   &svr_port
+		);
+
+	server = GetForeignServer(serveroid);
+
+	hadoopGetConnection(svr_username, svr_password, svr_host, svr_port, stmt->remote_schema);
+
+	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+	if (HadoopJDBCUtilsClass == NULL)
+	{
+		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
+	}
+
+	id_initialize = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "PrepareDDLStmtList", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+
+	if (id_initialize == NULL)
+	{
+		elog(ERROR, "id_initialize is NULL");
+	}
+
+	id_numberofrows = (*env)->GetFieldID(env, HadoopJDBCUtilsClass, "NumberOfRows", "I");
+	if (id_numberofrows == NULL)
+	{
+		elog(ERROR, "id_numberofrows is NULL");
+	}
+
+	schemaname = (*env)->NewStringUTF(env, stmt->remote_schema);
+	servername = (*env)->NewStringUTF(env, server->servername);
+	initialize_result = (*env)->CallObjectMethod(env, java_call, id_initialize, schemaname, servername);
+
+
+	if (initialize_result != NULL)
+	{
+		initialize_result_cstring = ConvertStringToCString((jobject) initialize_result);
+		elog(ERROR, "%s", initialize_result_cstring);
+	}
+
+	NumberOfRows = (*env)->GetIntField(env, java_call, id_numberofrows);
+
+	id_returnresultset = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "ReturnDDLStmtList", "()[Ljava/lang/String;");
+	if (id_returnresultset == NULL)
+	{
+		elog(ERROR, "id_returnresultset is NULL");
+	}
+
+	values = (char **) palloc(sizeof(char *) * NumberOfRows);
+
+	java_rowarray = (*env)->CallObjectMethod(env, java_call, id_returnresultset);
+
+	if (java_rowarray != NULL)
+	{
+
+		for (i = 0; i < NumberOfRows; i++)
+		{
+			resetStringInfo(&buf);
+			values[i] = ConvertStringToCString((jobject) (*env)->GetObjectArrayElement(env, java_rowarray, i));
+			appendStringInfo(&buf, "%s", values[i]);
+			result = lappend(result, pstrdup(buf.data));
+		}
+
+		for (j = 0; j < NumberOfRows; j++)
+		{
+			tempString = (jstring) (*env)->GetObjectArrayElement(env, java_rowarray, j);
+			(*env)->ReleaseStringUTFChars(env, tempString, values[j]);
+			(*env)->DeleteLocalRef(env, tempString);
+		}
+
+		(*env)->DeleteLocalRef(env, java_rowarray);
+	}
+
+
+	(*env)->ReleaseStringUTFChars(env, initialize_result, initialize_result_cstring);
+	(*env)->DeleteLocalRef(env, initialize_result);
+
+	(*env)->PopLocalFrame(env, NULL);
+	return result;
+}
+#endif  /* HADOOP_FDW_IMPORT_API */
+
+/*
+ * hadoopGetConnection
+ *		Initiate access to the database
+ */
+static hadoopFdwExecutionState *
+hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int svr_port, char *svr_schema)
+{
+	char	   *svr_url = NULL;
+	hadoopFdwExecutionState *festate = NULL;
+	jclass		HadoopJDBCUtilsClass;
+	jclass		JavaString;
+	jstring		StringArray[7];
+	jstring		initialize_result = NULL;
+	jmethodID	id_initialize;
+	jobjectArray arg_array;
+	int			counter = 0;
+	int			referencedeletecounter = 0;
+	char	   *jar_classpath;
+	char	   *initialize_result_cstring = NULL;
+	char	   *var_CP = NULL;
+	int			cp_len = 0;
+	char	   *portstr = NULL;
+
+	SIGINTInterruptCheckProcess();
+
+	/* Set the options for JNI */
+	var_CP = getenv("HADOOP_JDBC_CLASSPATH");
+	cp_len = strlen(var_CP) + 2;
+	jar_classpath = (char *) palloc(cp_len);
+	snprintf(jar_classpath, (cp_len + 1), "%s", var_CP);
+
+	portstr = (char *) palloc(sizeof(int));
+	snprintf(portstr, sizeof(int), "%d", svr_port);
+
+	if (svr_schema)
+	{
+		cp_len = strlen(svr_schema) + strlen(svr_host) + sizeof(int) + 30;
+		svr_url = (char *) palloc(cp_len);
+		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/%s", svr_host, svr_port, svr_schema);
+	}
+	else
+	{
+		cp_len = strlen(svr_host) + sizeof(int) + 30;
+		svr_url = (char *) palloc(cp_len);
+		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/default", svr_host, svr_port);
+	}
+
+	/* Stash away the state info we have already */
+	festate = (hadoopFdwExecutionState *) palloc(sizeof(hadoopFdwExecutionState));
+
+	/* Connect to the server and execute the query */
+	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
+	if (HadoopJDBCUtilsClass == NULL)
+	{
+		elog(ERROR, "HadoopJDBCUtilsClass is NULL");
+	}
+
+	id_initialize = (*env)->GetMethodID(env, HadoopJDBCUtilsClass, "ConnInitialize", "([Ljava/lang/String;)Ljava/lang/String;");
+	if (id_initialize == NULL)
+	{
+		elog(ERROR, "id_ConnInitialize is NULL");
+	}
+
+	if (svr_username == NULL)
+	{
+		svr_username = "";
+	}
+
+	if (svr_password == NULL)
+	{
+		svr_password = "";
+	}
+
+	StringArray[0] = (*env)->NewStringUTF(env, "org.apache.hive.jdbc.HiveDriver");
+	StringArray[1] = (*env)->NewStringUTF(env, svr_url);
+	StringArray[2] = (*env)->NewStringUTF(env, svr_username);
+	StringArray[3] = (*env)->NewStringUTF(env, svr_password);
+	StringArray[4] = (*env)->NewStringUTF(env, jar_classpath);
+
+	JavaString = (*env)->FindClass(env, "java/lang/String");
+
+	arg_array = (*env)->NewObjectArray(env, 5, JavaString, StringArray[0]);
+	if (arg_array == NULL)
+	{
+		elog(ERROR, "arg_array is NULL");
+	}
+
+	for (counter = 1; counter < 5; counter++)
+	{
+		(*env)->SetObjectArrayElement(env, arg_array, counter, StringArray[counter]);
+	}
+
+	java_call = (*env)->AllocObject(env, HadoopJDBCUtilsClass);
+	if (java_call == NULL)
+	{
+		elog(ERROR, "java_call is NULL");
+	}
+
+	initialize_result = (*env)->CallObjectMethod(env, java_call, id_initialize, arg_array);
+	if (initialize_result != NULL)
+	{
+		initialize_result_cstring = ConvertStringToCString((jobject) initialize_result);
+		elog(ERROR, "%s", initialize_result_cstring);
+	}
+
+	for (referencedeletecounter = 0; referencedeletecounter < 5; referencedeletecounter++)
+	{
+		(*env)->DeleteLocalRef(env, StringArray[referencedeletecounter]);
+	}
+
+	(*env)->DeleteLocalRef(env, arg_array);
+	(*env)->ReleaseStringUTFChars(env, initialize_result, initialize_result_cstring);
+	(*env)->DeleteLocalRef(env, initialize_result);
+	return festate;
+}

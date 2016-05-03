@@ -8,7 +8,7 @@
 ##########################################################################
 
 MODULE_big = hadoop_fdw
-OBJS = hadoop_fdw.o
+OBJS = hadoop_fdw.o deparse.o hive_funcs.o
 
 EXTENSION = hadoop_fdw
 DATA = hadoop_fdw--2.0.sql
