@@ -1112,7 +1112,11 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	SIGINTInterruptCheckProcess();
 
 	/* Create a ForeignPath node and add it as only possible path */
-	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NULL));
+#if PG_VERSION_NUM < 90500
+	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL));
+#else
+	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
+#endif
 }
 
 /*
