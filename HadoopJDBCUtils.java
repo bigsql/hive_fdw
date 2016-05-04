@@ -246,14 +246,14 @@ public class HadoopJDBCUtils
 	{
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
-		ResultSetMetaData       result_set_metadata1;
-		Properties              HadoopProperties;
-                Class                   HadoopDriverClass = null;
-                Driver                  HadoopDriver = null;
+		ResultSetMetaData	result_set_metadata1;
+		Properties		HadoopProperties;
+		Class			HadoopDriverClass = null;
+		Driver			HadoopDriver = null;
 		String[]		column_name;
 		String[]		column_type;
 		int[]			column_size;
-		int[]                   column_length;
+		int[]			column_length;
 		int			total_col = 0;
 		int			col = 0;
 		int			i = 0;
@@ -270,7 +270,7 @@ public class HadoopJDBCUtils
 			result_set = db_metadata.getTables(null, schema , "%", null);
 
 			result_set_metadata = result_set.getMetaData();
-                        NumberOfColumns = result_set_metadata.getColumnCount();
+			NumberOfColumns = result_set_metadata.getColumnCount();
 
 			Iterate = new String[100];
 			column_name = new String[200];
@@ -280,10 +280,10 @@ public class HadoopJDBCUtils
 
 			mylist = new ArrayList<String>();
 		 try
-                {
-                        while (result_set.next())
-                        {
-                                         String table_name = result_set.getString("TABLE_NAME");
+		{
+			while (result_set.next())
+			{
+					 String table_name = result_set.getString("TABLE_NAME");
 
 				      result_set1 = db_metadata.getColumns(null,
 						  schema,
@@ -303,33 +303,33 @@ public class HadoopJDBCUtils
 					String field = column_type[total_col];
 
 					if (field.compareTo( "TINYINT") == 0)
-                                                column_type[total_col]  = "smallint";
-                                        else if (field.compareTo("INT") == 0)
-                                                column_type[total_col] = "int";
-                                        else if (field.compareTo("BIGINT") == 0)
-                                                column_type[total_col] = "bigint";
-                                        else if (field.compareTo("BOOLEAN") == 0)
-                                                column_type[total_col] = "boolean";
-                                        else if (field.compareTo("FLOAT") == 0)
-                                                column_type[total_col] = "float";
-                                        else if (field.compareTo("DOUBLE") == 0)
-					        column_type[total_col] = "double precision";
+						column_type[total_col]	= "smallint";
+					else if (field.compareTo("INT") == 0)
+						column_type[total_col] = "int";
+					else if (field.compareTo("BIGINT") == 0)
+						column_type[total_col] = "bigint";
+					else if (field.compareTo("BOOLEAN") == 0)
+						column_type[total_col] = "boolean";
+					else if (field.compareTo("FLOAT") == 0)
+						column_type[total_col] = "float";
+					else if (field.compareTo("DOUBLE") == 0)
+						column_type[total_col] = "double precision";
 					else if (field.compareTo("STRING") == 0)
-                                                column_type[total_col] = "varchar";
-                                        else if (field.compareTo("BINARY") == 0)
-                                                column_type[total_col] = "bytea";
-                                        else if (field.compareTo("TIMESTAMP") == 0)
-                                                column_type[total_col] = "timestamp";
-                                        else if (field.compareTo("DECIMAL") == 0)
-                                                column_type[total_col] = "decimal";
-				        else if (field.compareTo("BINARY") == 0)
-                                                column_type[total_col] = "bytea";
-                                        else if (field.compareTo("TIMESTAMP") == 0)
-                                                column_type[total_col] = "timestamp";
-					else    /* We need to error out for unsupported data types */
-                                        {
-                                                System.out.println("Unsupported Hive Data Type "+ field);
-                                        }
+						column_type[total_col] = "varchar";
+					else if (field.compareTo("BINARY") == 0)
+						column_type[total_col] = "bytea";
+					else if (field.compareTo("TIMESTAMP") == 0)
+						column_type[total_col] = "timestamp";
+					else if (field.compareTo("DECIMAL") == 0)
+						column_type[total_col] = "decimal";
+					else if (field.compareTo("BINARY") == 0)
+						column_type[total_col] = "bytea";
+					else if (field.compareTo("TIMESTAMP") == 0)
+						column_type[total_col] = "timestamp";
+					else	/* We need to error out for unsupported data types */
+					{
+						System.out.println("Unsupported Hive Data Type "+ field);
+					}
 
 					total_col++;
 					}
@@ -350,9 +350,9 @@ public class HadoopJDBCUtils
 						}
 
 						 if( col == total_col-1 )
-                                                {
-                                                   stmt_str = stmt_str+")";
-                                                }
+						{
+						   stmt_str = stmt_str+")";
+						}
 						else
 						{
 						  stmt_str = stmt_str+",";
@@ -365,7 +365,7 @@ public class HadoopJDBCUtils
 					System.out.println("STATEMENT "+s);
 					i++;
 					total_col = 0;
-                         }
+			 }
 			int sz = mylist.size();
 			Iterate = new String[sz];
 			for (int j = 0; j < sz; j++)
@@ -374,10 +374,10 @@ public class HadoopJDBCUtils
 			}
 			NumberOfRows = sz;
 		}
-                catch (Exception returnresultset_exception)
-                {
-                        returnresultset_exception.printStackTrace();
-                }
+		catch (Exception returnresultset_exception)
+		{
+			returnresultset_exception.printStackTrace();
+		}
 
 	}
 	catch (Exception initialize_exception)
@@ -400,9 +400,9 @@ public class HadoopJDBCUtils
 
 
 public String[]
-        ReturnDDLStmtList()
-        {
+	ReturnDDLStmtList()
+	{
 		int i=0;
-                return Iterate;
+		return Iterate;
 	}
 }
