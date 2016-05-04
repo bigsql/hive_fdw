@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HADOOP 
+ *		  foreign-data wrapper for HADOOP
  *
  * IDENTIFICATION
  *		  hadoop_fdw/HadoopJDBCUtils.java
@@ -40,26 +40,26 @@ public class HadoopJDBCUtils
 	public String
 	ConnInitialize(String[] options_array) throws IOException
 	{
-		DatabaseMetaData 	db_metadata;
-		ResultSetMetaData 	result_set_metadata;
-		Properties 		HadoopProperties;
-		Class 			HadoopDriverClass = null;
-		Driver 			HadoopDriver = null;
-		String 			DriverClassName = options_array[0];
-		String 			url = options_array[1];
-  		String 			userName = options_array[2];
-  		String 			password = options_array[3];
+		DatabaseMetaData	db_metadata;
+		ResultSetMetaData	result_set_metadata;
+		Properties		HadoopProperties;
+		Class			HadoopDriverClass = null;
+		Driver				HadoopDriver = null;
+		String				DriverClassName = options_array[0];
+		String				url = options_array[1];
+		String				userName = options_array[2];
+		String				password = options_array[3];
 
 		exception_stack_trace_string_writer = new StringWriter();
- 		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
+		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
 
-  		NumberOfColumns = 0;
-  		conn = null;
+		NumberOfColumns = 0;
+		conn = null;
 
 		try
 		{
-			File 	JarFile = new File(options_array[4]);
-			String 	jarfile_path = JarFile.toURI().toURL().toString();
+			File	JarFile = new File(options_array[4]);
+			String		jarfile_path = JarFile.toURI().toURL().toString();
 
 			if (Hadoop_Driver_Loader == null)
 			{
@@ -83,14 +83,14 @@ public class HadoopJDBCUtils
 
 		}
 		catch (Exception initialize_exception)
-	  	{
+		{
 			/* If an exception occurs,it is returned back to the
 			 * calling C code by returning a Java String object
 			 * that has the exception's stack trace.
 			 * If all goes well,a null String is returned. */
-  	  		initialize_exception.printStackTrace(exception_stack_trace_print_writer);
+			initialize_exception.printStackTrace(exception_stack_trace_print_writer);
 			return (new String(exception_stack_trace_string_writer.toString()));
-	  	}
+		}
 		return null;
 	}
 
@@ -103,38 +103,38 @@ public class HadoopJDBCUtils
 	public String
 	Execute_Query(String query) throws IOException
 	{
-		DatabaseMetaData 	db_metadata;
-		ResultSetMetaData 	result_set_metadata;
-		Properties 		HadoopProperties;
-		Class 			HadoopDriverClass = null;
-		Driver 			HadoopDriver = null;
+		DatabaseMetaData	db_metadata;
+		ResultSetMetaData	result_set_metadata;
+		Properties		HadoopProperties;
+		Class			HadoopDriverClass = null;
+		Driver				HadoopDriver = null;
 
 		exception_stack_trace_string_writer = new StringWriter();
- 		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
-  		NumberOfColumns = 0;
+		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
+		NumberOfColumns = 0;
 
-  		try
+		try
 		{
-  			db_metadata = conn.getMetaData();
+			db_metadata = conn.getMetaData();
 
-  			sql = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+			sql = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
-  			result_set = sql.executeQuery(query);
+			result_set = sql.executeQuery(query);
 
-  			result_set_metadata = result_set.getMetaData();
+			result_set_metadata = result_set.getMetaData();
 			NumberOfColumns = result_set_metadata.getColumnCount();
 			Iterate = new String[NumberOfColumns];
 		}
 		catch (Exception initialize_exception)
-	  	{
+		{
 			/* If an exception occurs,it is returned back to the
 			 * calling C code by returning a Java String object
 			 * that has the exception's stack trace.
 			 * If all goes well,a null String is returned. */
 
-  	  		initialize_exception.printStackTrace(exception_stack_trace_print_writer);
+			initialize_exception.printStackTrace(exception_stack_trace_print_writer);
 			return (new String(exception_stack_trace_string_writer.toString()));
-	  	}
+		}
 		return null;
 	}
 
@@ -143,10 +143,10 @@ public class HadoopJDBCUtils
  *		Returns the result set that is returned from the foreign database
  *		after execution of the query to C code.
  */
-	public String[] 
+	public String[]
 	ReturnResultSet()
 	{
-		int 	i = 0;
+		int	i = 0;
 
 		try
 		{
@@ -156,7 +156,7 @@ public class HadoopJDBCUtils
 			{
 				for (i = 0; i < NumberOfColumns; i++)
 				{
-    					Iterate[i] = result_set.getString(i+1);
+					Iterate[i] = result_set.getString(i+1);
 				}
 
 				++NumberOfRows;
@@ -171,9 +171,9 @@ public class HadoopJDBCUtils
 
 		}
 		catch (Exception returnresultset_exception)
-	 	{
+		{
 			returnresultset_exception.printStackTrace();
-	 	}
+		}
 
 		/* All of result_set's rows have been returned to the C code. */
 		return null;
@@ -196,15 +196,15 @@ public class HadoopJDBCUtils
 			Iterate = null;
 		}
 		catch (Exception close_exception)
-	 	{
+		{
 			/* If an exception occurs,it is returned back to the
 			 * calling C code by returning a Java String object
 			 * that has the exception's stack trace.
 			 * If all goes well,a null String is returned. */
 
-	 		close_exception.printStackTrace(exception_stack_trace_print_writer);
+			close_exception.printStackTrace(exception_stack_trace_print_writer);
 			return (new String(exception_stack_trace_string_writer.toString()));
-	 	}
+		}
 
 		return null;
 	}
@@ -224,7 +224,7 @@ public class HadoopJDBCUtils
 			conn.close();
 		}
 		catch(Exception cancel_exception)
-	 	{
+		{
 			/* If an exception occurs,it is returned back to the
 			 * calling C code by returning a Java String object
 			 * that has the exception's stack trace.
@@ -232,7 +232,7 @@ public class HadoopJDBCUtils
 
 			cancel_exception.printStackTrace(exception_stack_trace_print_writer);
 			return (new String(exception_stack_trace_string_writer.toString()));
-  	 	}
+		}
 
 		return null;
 	}
@@ -244,41 +244,41 @@ public class HadoopJDBCUtils
 	public String
 	    PrepareDDLStmtList(String schema, String servername) throws IOException
 	{
-		DatabaseMetaData 	db_metadata;
-		ResultSetMetaData 	result_set_metadata;
-		ResultSetMetaData       result_set_metadata1;  
+		DatabaseMetaData	db_metadata;
+		ResultSetMetaData	result_set_metadata;
+		ResultSetMetaData       result_set_metadata1;
 		Properties              HadoopProperties;
                 Class                   HadoopDriverClass = null;
                 Driver                  HadoopDriver = null;
-		String[]           	column_name;
-		String[]           	column_type;
-		int[]		  	column_size;
+		String[]		column_name;
+		String[]		column_type;
+		int[]			column_size;
 		int[]                   column_length;
-		int 			total_col = 0;
-		int 			col = 0;	
-		int 			i = 0;
-		
-		exception_stack_trace_string_writer = new StringWriter();
- 		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
+		int			total_col = 0;
+		int			col = 0;
+		int			i = 0;
 
-  		NumberOfColumns = 0;
-  		
-		try 
+		exception_stack_trace_string_writer = new StringWriter();
+		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
+
+		NumberOfColumns = 0;
+
+		try
 		{
 			db_metadata = conn.getMetaData();
 
- 			result_set = db_metadata.getTables(null, schema , "%", null);
+			result_set = db_metadata.getTables(null, schema , "%", null);
 
- 			result_set_metadata = result_set.getMetaData();
+			result_set_metadata = result_set.getMetaData();
                         NumberOfColumns = result_set_metadata.getColumnCount();
-                    
- 		 	Iterate = new String[100];
+
+			Iterate = new String[100];
 			column_name = new String[200];
 			column_type = new String[200];
 			column_size = new int[200];
 			column_length = new int[200];
 
-			mylist = new ArrayList<String>();			
+			mylist = new ArrayList<String>();
 		 try
                 {
                         while (result_set.next())
@@ -286,22 +286,22 @@ public class HadoopJDBCUtils
                                          String table_name = result_set.getString("TABLE_NAME");
 
 				      result_set1 = db_metadata.getColumns(null,
-                                   		  schema,
-                                  		  table_name ,
-                   				  null);
+						  schema,
+						  table_name ,
+						  null);
 
-                    			result_set_metadata1 = result_set1.getMetaData();
-                    			NumberOfColumns = result_set_metadata1.getColumnCount();
-				        
+					result_set_metadata1 = result_set1.getMetaData();
+					NumberOfColumns = result_set_metadata1.getColumnCount();
+
 					while (result_set1.next())
 					{
-						column_name[total_col] =  result_set1.getString("COLUMN_NAME");	
+						column_name[total_col] =  result_set1.getString("COLUMN_NAME");
 						column_type[total_col] = result_set1.getString("TYPE_NAME");
 						column_size[total_col] = result_set1.getInt("COLUMN_SIZE");
 						column_length[total_col] = result_set1.getInt("CHAR_OCTET_LENGTH");
-			
+
 					String field = column_type[total_col];
-		
+
 					if (field.compareTo( "TINYINT") == 0)
                                                 column_type[total_col]  = "smallint";
                                         else if (field.compareTo("INT") == 0)
@@ -314,7 +314,7 @@ public class HadoopJDBCUtils
                                                 column_type[total_col] = "float";
                                         else if (field.compareTo("DOUBLE") == 0)
 					        column_type[total_col] = "double precision";
-                                	else if (field.compareTo("STRING") == 0)
+					else if (field.compareTo("STRING") == 0)
                                                 column_type[total_col] = "varchar";
                                         else if (field.compareTo("BINARY") == 0)
                                                 column_type[total_col] = "bytea";
@@ -331,14 +331,14 @@ public class HadoopJDBCUtils
                                                 System.out.println("Unsupported Hive Data Type "+ field);
                                         }
 
-					total_col++;	
+					total_col++;
 					}
 					String stmt_str = "CREATE FOREIGN TABLE "+table_name+"(";
 					for(col = 0;col<total_col;col++)
 					{
 						if(column_type[col].compareTo("CHAR") == 0)
-						{ 
-						  stmt_str = stmt_str+column_name[col]+" "+column_type[col]+"("+column_size[col]+")";	
+						{
+						  stmt_str = stmt_str+column_name[col]+" "+column_type[col]+"("+column_size[col]+")";
 						}
 						else if(column_type[col].compareTo("VARCHAR") == 0)
 						{
@@ -379,15 +379,15 @@ public class HadoopJDBCUtils
                         returnresultset_exception.printStackTrace();
                 }
 
-	}	
+	}
 	catch (Exception initialize_exception)
-	  	{
+		{
 			/* If an exception occurs,it is returned back to the
 			 * calling C code by returning a Java String object
 			 * that has the exception's stack trace.
 			 * If all goes well,a null String is returned. */
 
-  	  		initialize_exception.printStackTrace(exception_stack_trace_print_writer);
+			initialize_exception.printStackTrace(exception_stack_trace_print_writer);
 			return (new String(exception_stack_trace_string_writer.toString()));
 		}
 
@@ -397,12 +397,12 @@ public class HadoopJDBCUtils
 /*  Retruns the foreign table DDL statements string array
  *
  */
- 
- 
+
+
 public String[]
         ReturnDDLStmtList()
         {
-		int i=0;                
+		int i=0;
                 return Iterate;
 	}
-} 
+}
