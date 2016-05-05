@@ -220,18 +220,16 @@ If you are installing from source, please follow the instructions in
 
 ## Prepare the Environment ##
 
-The Hadoop FDW needs two environment variables set for the PostgreSQL
+The Hadoop FDW needs the following environment variable set for the PostgreSQL
 server:
 
-- **PGHOME**
-
-    The parent of the PostgreSQL `lib` directory; typically this is the
-    PostgreSQL root directory.
-
-- **HADOOP_JDBC_CLASSPATH**
+- **HADOOP_FDW_CLASSPATH**
 
     The `CLASSPATH` referencing all the Hive client JAR files we
-    identified previously.
+    identified previously and the hadoop_fdw.jar file which resides
+    in the same directory as that of the PostgreSQL extension
+    library files.
+
 
 We provide OS-specific examples for these variables below.
 
@@ -253,12 +251,11 @@ run in a shell:
 sudo ln -s /opt/jdk/x64/jdk1.8.0_40/jre/lib/amd64/server/libjvm.so /usr/local/pgsql/lib/libjvm.so
 ```
 
-Also, in the shell, set up the requisite environment variables.  In this
+Also, in the shell, set up the requisite environment variables. In this
 example, we are using bash:
 
 ```bash
-export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/lib/hadoop_fdw.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
@@ -286,15 +283,13 @@ Next, in the Command Prompt, set up the requisite environment variables.
 #### CDH ####
 
 ```bat
-set PGHOME=C:\msys2-x64\usr\local\pgsql
-set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
+set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
 #### HDP ####
 
 ```bat
-set PGHOME=C:\msys2-x64\usr\local\pgsql
-set HADOOP_JDBC_CLASSPATH=C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
+set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
 
 Then start the PostgreSQL server from this Command Prompt to have the
@@ -324,8 +319,7 @@ Also, in the shell, set up the requisite environment variables.  In this
 example, we are using bash:
 
 ```bash
-export PGHOME=/usr/local/pgsql
-export HADOOP_JDBC_CLASSPATH=$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/hadoop_fdw.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick

@@ -330,7 +330,6 @@ JVMInitialization(Oid serveroid)
 	int			svr_querytimeout = 0;
 	int			svr_maxheapsize = 0;
 	char	   *var_CP = NULL;
-	char	   *var_PGHOME = NULL;
 	int			cp_len = 0;
 
 	hadoopGetServerOptions(
@@ -351,28 +350,22 @@ JVMInitialization(Oid serveroid)
 	if (FunctionCallCheck == false)
 	{
 
-		var_CP = getenv("HADOOP_JDBC_CLASSPATH");
-		var_PGHOME = getenv("PGHOME");
+		var_CP = getenv("HADOOP_FDW_CLASSPATH");
 
 		if (!var_CP)
 		{
-			elog(ERROR, "Please set the environment variable HADOOP_JDBC_CLASSPATH");
+			elog(ERROR, "Please set the environment variable HADOOP_FDW_CLASSPATH");
 		}
 
-		if (!var_PGHOME)
-		{
-			elog(ERROR, "Please set the environment variable PGHOME");
-		}
-
-		cp_len = strlen(var_CP) + strlen(var_PGHOME) + 25;
+		cp_len = strlen(var_CP) + 25;
 		classpath = (char *) palloc(cp_len);
 		snprintf(classpath, cp_len,
 #if defined(__MINGW64__) || defined(WIN32)
-		         "-Djava.class.path=%s\\lib;%s",
+		         "-Djava.class.path=%s",
 #else
-		         "-Djava.class.path=%s/lib:%s",
+		         "-Djava.class.path=%s",
 #endif /* defined(__MINGW64__) || defined(WIN32) */
-		         var_PGHOME, var_CP);
+		         var_CP);
 
 		if (svr_maxheapsize != 0)		/* If the user has given a value for
 										 * setting the max heap size of the
