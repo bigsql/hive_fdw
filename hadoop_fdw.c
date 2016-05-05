@@ -1443,7 +1443,11 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	SIGINTInterruptCheckProcess();
 
 	/* Set the options for JNI */
-	var_CP = getenv("HADOOP_JDBC_CLASSPATH");
+	var_CP = getenv("HADOOP_FDW_CLASSPATH");
+	if (!var_CP)
+	{
+		elog(ERROR, "Please set the environment variable HADOOP_FDW_CLASSPATH");
+	}
 	cp_len = strlen(var_CP) + 2;
 	jar_classpath = (char *) palloc(cp_len);
 	snprintf(jar_classpath, (cp_len + 1), "%s", var_CP);
