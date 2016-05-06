@@ -124,6 +124,7 @@ typedef struct hadoopFdwExecutionState
 	char	   *query;
 	int			NumberOfRows;
 	int			NumberOfColumns;
+	jobject		java_call;
 	List	   *retrieved_attrs;	/* list of retrieved attribute numbers */
 } hadoopFdwExecutionState;
 
@@ -981,6 +982,7 @@ hadoopIterateForeignScan(ForeignScanState *node)
 	jstring		tempString;
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
+	jobject		java_call = festate->java_call;
 
 	/* Cleanup */
 	ExecClearTuple(slot);
@@ -1049,6 +1051,7 @@ hadoopEndForeignScan(ForeignScanState *node)
 	jstring		close_result = NULL;
 	char	   *close_result_cstring = NULL;
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
+	jobject		java_call = festate->java_call;
 
 	SIGINTInterruptCheckProcess();
 
@@ -1518,6 +1521,8 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	{
 		elog(ERROR, "java_call is NULL");
 	}
+
+	festate->java_call = java_call;
 
 	initialize_result = (*env)->CallObjectMethod(env, java_call, id_initialize, arg_array);
 	if (initialize_result != NULL)
