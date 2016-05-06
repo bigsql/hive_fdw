@@ -230,7 +230,6 @@ server:
     in the same directory as that of the PostgreSQL extension
     library files.
 
-
 We provide OS-specific examples for these variables below.
 
 ### Perform OS-Specific Setup ###
@@ -240,9 +239,9 @@ for the platform matching that of your PostgreSQL server:
 
 ### Linux ###
 
-We assume the default PostgreSQL prefix (`/usr/local/pgsql`) on Linux
-and that the Hive client JAR files were copied under the directory
-`/opt/hadoop/hive-client-lib`.
+We assume that `hadoop_fdw.jar` resides under the PostgreSQL extension
+library directory `/usr/local/pgsql/lib` and that the Hive client JAR
+files were copied under the directory `/opt/hadoop/hive-client-lib`.
 
 Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
 run in a shell:
@@ -263,9 +262,9 @@ up the variables we set up.
 
 ### Windows ###
 
-We assume that PostgreSQL is installed in `C:\msys2-x64\usr\local\pgsql`
-and that the Hive client JAR files were copied under the directory
-`C:\hive-client-lib`.
+We assume that `hadoop_fdw.jar` resides under the PostgreSQL extension
+library directory `C:\msys2-x64\usr\local\pgsql\lib` and that the Hive
+client JAR files were copied under the directory `C:\hive-client-lib`.
 
 Add your JDK's `bin` and `jre\bin\server` directories to the PATH
 environment variable.  Assuming the Java install location of
@@ -283,13 +282,13 @@ Next, in the Command Prompt, set up the requisite environment variables.
 #### CDH ####
 
 ```bat
-set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
+set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\lib\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
 #### HDP ####
 
 ```bat
-set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
+set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\lib\hadoop_fdw.jar;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
 
 Then start the PostgreSQL server from this Command Prompt to have the
@@ -304,9 +303,9 @@ continuing otherwise the FDW will crash the PostgreSQL server because of
 [this](https://bugs.openjdk.java.net/browse/JDK-7131356) open issue with
 the Oracle JDK.**
 
-We assume the PostgreSQL prefix (`/usr/local/pgsql`) and that the Hive
-client JAR files were copied under the directory
-`/opt/hadoop/hive-client-lib`.
+We assume that `hadoop_fdw.jar` resides under the PostgreSQL extension
+library directory `/usr/local/pgsql/lib` and that the Hive client JAR
+files were copied under the directory `/opt/hadoop/hive-client-lib`.
 
 Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
 run in a shell:
@@ -319,7 +318,7 @@ Also, in the shell, set up the requisite environment variables.  In this
 example, we are using bash:
 
 ```bash
-export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/hadoop_fdw.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
+export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/lib/hadoop_fdw.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 Then start the PostgreSQL server from this shell to have the server pick
