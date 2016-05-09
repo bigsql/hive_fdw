@@ -21,10 +21,13 @@
 #include "optimizer/planmain.h"
 #include "utils/rel.h"
 
+#define HADOOP_FDW_NAME				"hadoop_fdw"
+
 extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 
-extern void appendWhereClause(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
-                              List *exprs, bool is_first, List **params);
+extern void
+appendWhereClause(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
+				  List *exprs, bool is_first, List **params);
 
 extern void deparseSelectSql(StringInfo buf,
 				 PlannerInfo *root,

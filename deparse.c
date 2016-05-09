@@ -72,8 +72,6 @@ static void deparseTargetList(StringInfo buf, PlannerInfo *root, Index rtindex,
 static bool
 foreign_expr_walker(Node *node, foreign_glob_cxt *glob_cxt)
 {
-	elog(DEBUG2,"Start: foreign_expr_walker");
-
 	/* Need do nothing for empty subexpressions */
 	if (node == NULL)
 		return true;
@@ -356,8 +354,6 @@ is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 {
 	foreign_glob_cxt glob_cxt;
 
-	elog(DEBUG2,"Start: is_foreign_expr");
-
 	/*
 	 * Check that the expression consists of nodes that are safe to execute
 	 * remotely.
@@ -367,12 +363,16 @@ is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 	if (!foreign_expr_walker((Node *) expr, &glob_cxt))
 		return false;
 
-	/* What to do with mutable functions?
-	 * if (contain_mutable_functions((Node *) expr))
-	 * return false;
-	 */
+	if (contain_mutable_functions((Node *) expr))
+	{
+		elog(DEBUG2, HADOOP_FDW_NAME
+			 ": pushdown prevented because the results of mutable functions "
+			 "are not stable.");
+		return false;
+	}
 
-	elog(DEBUG2,"End: is_foreign_expr");
+
+	elog(DEBUG5, HADOOP_FDW_NAME ": pushdown expression checks passed");
 
 	/* OK to evaluate on the remote server */
 	return true;
@@ -381,19 +381,17 @@ is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 
 void
 appendWhereClause(StringInfo buf,
-                                  PlannerInfo *root,
-                                  RelOptInfo *baserel,
-                                  List *exprs,
-                                  bool is_first,
-                                  List **params)
+				  PlannerInfo *root,
+				  RelOptInfo *baserel,
+				  List *exprs,
+				  bool is_first,
+				  List **params)
 {
 	deparse_expr_cxt context;
 	ListCell   *lc;
 
-	elog(DEBUG2,"Start: appendWhereClause");
-
 	if (params)
-		*params = NIL;	/* initialize result list to empty */
+		*params = NIL;			/* initialize result list to empty */
 
 	/* Set up context struct for recursion */
 	context.root = root;
@@ -418,14 +416,11 @@ appendWhereClause(StringInfo buf,
 		is_first = false;
 	}
 
-	elog(DEBUG2,"End: appendWhereClause");
 }
 
 static void
 deparseExpr(Expr *node, deparse_expr_cxt *context)
 {
-	elog(DEBUG2,"Start: deparseExpr");
-
 	if (node == NULL)
 		return;
 
@@ -463,7 +458,6 @@ deparseExpr(Expr *node, deparse_expr_cxt *context)
 				 (int) nodeTag(node));
 			break;
 	}
-	elog(DEBUG2,"End: deparseExpr");
 }
 
 
@@ -480,6 +474,8 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 	Expr	   *arg1;
 	Expr	   *arg2;
 	char	   *oprname;
+
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_ScalarArrayOpExpr");
 
 	/* Retrieve information about the operator from system catalog. */
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(node->opno));
@@ -530,6 +526,8 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 static void
 deparseRelabelType(RelabelType *node, deparse_expr_cxt *context)
 {
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_RelabelType");
+
 	deparseExpr(node->arg, context);
 	if (node->relabelformat != COERCE_IMPLICIT_CAST)
 		appendStringInfo(context->buf, "::%s",
@@ -543,7 +541,7 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
-	elog(DEBUG2,"Start: deparseVar");
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_Var");
 
 	if (node->varno == context->foreignrel->relid &&
 		node->varlevelsup == 0)
@@ -585,7 +583,6 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 													  node->vartypmod));
 		}
 	}
-	elog(DEBUG2,"End: deparseVar");
 }
 
 
@@ -604,7 +601,7 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 	ArrayType  *arr;
 	ArrayIterator array_iterator;
 
-	elog(DEBUG2,"Start: deparseConst");
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_Const");
 
 	if (node->constisnull)
 	{
@@ -722,8 +719,6 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 	 * There is no ::typename business with constants in Hive. We hope that
 	 * Hive can implicitly understand the "right" type..
 	 */
-
-	elog(DEBUG2,"End: deparseConst");
 }
 
 static void
@@ -731,7 +726,7 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
-	elog(DEBUG2,"Start: deparseParam");
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_Param");
 
 	if (context->params_list)
 	{
@@ -763,8 +758,6 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 						 format_type_with_typemod(node->paramtype,
 												  node->paramtypmod));
 	}
-	elog(DEBUG2,"End: deparseParam");
-
 }
 
 /*
@@ -782,6 +775,8 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 	const char *proname, *fname;
 	bool		first, skip_first_arg = false;
 	ListCell   *arg;
+
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_FuncExpr");
 
 	/*
 	 * If the function call came from an implicit coercion, then just show the
@@ -850,7 +845,7 @@ deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
 	ListCell   *arg;
 	char	   *oprname;
 
-	elog(DEBUG2,"Start: deparseOpExpr");
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_OpExpr");
 
 	/* Retrieve information about the operator from system catalog. */
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(node->opno));
@@ -899,8 +894,6 @@ deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
 	appendStringInfoChar(buf, ')');
 
 	ReleaseSysCache(tuple);
-
-	elog(DEBUG2,"End: deparseOpExpr");
 }
 
 /*
@@ -916,6 +909,8 @@ deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
 	const char *op = NULL;		/* keep compiler quiet */
 	bool		first;
 	ListCell   *lc;
+
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_BoolExpr");
 
 	switch (node->boolop)
 	{
@@ -951,6 +946,8 @@ static void
 deparseNullTest(NullTest *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
+
+	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_NullTest");
 
 	appendStringInfoChar(buf, '(');
 	deparseExpr(node->arg, context);

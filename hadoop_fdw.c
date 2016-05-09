@@ -852,6 +852,9 @@ hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es)
 
 	f_table = GetForeignTable(RelationGetRelid(node->ss.ss_currentRelation));
 
+	elog(DEBUG3, HADOOP_FDW_NAME ": explain foreign scan for relation ID %d",
+		 RelationGetRelid(node->ss.ss_currentRelation));
+
 	/* Fetch options  */
 	hadoopGetServerOptions(
 						   f_table->serverid,
@@ -896,9 +899,10 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 
-	elog(DEBUG2, "Start: hadoopBeginForeignScan");
-
 	SIGINTInterruptCheckProcess();
+
+	elog(DEBUG3, HADOOP_FDW_NAME ": begin foreign scan for relation ID %d",
+		 RelationGetRelid(node->ss.ss_currentRelation));
 
 	/* Fetch options  */
 	foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
@@ -1055,6 +1059,9 @@ hadoopEndForeignScan(ForeignScanState *node)
 
 	SIGINTInterruptCheckProcess();
 
+	elog(DEBUG3, HADOOP_FDW_NAME ": end foreign scan for relation ID %d",
+		 RelationGetRelid(node->ss.ss_currentRelation));
+
 	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
 	if (HadoopJDBCUtilsClass == NULL)
 	{
@@ -1107,6 +1114,9 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 
 	SIGINTInterruptCheckProcess();
 
+	elog(DEBUG3, HADOOP_FDW_NAME
+		 ": get foreign paths for relation ID %d", foreigntableid);
+
 	/* Create a ForeignPath node and add it as only possible path */
 #if PG_VERSION_NUM < 90500
 	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL));
@@ -1158,7 +1168,8 @@ hadoopGetForeignPlan(PlannerInfo *root,
 
 	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) baserel->fdw_private;
 
-	elog(DEBUG2, "Start: hadoopGetForeignPlan");
+	elog(DEBUG3, HADOOP_FDW_NAME
+		 ": get foreign plan for relation ID %d", foreigntableid);
 
 	f_table = GetForeignTable(foreigntableid);
 	JVMInitialization(f_table->serverid);
@@ -1196,6 +1207,8 @@ hadoopGetForeignPlan(PlannerInfo *root,
 					 &retrieved_attrs);
 	appendStringInfo(&sql, "%s", " FROM ");
 
+	elog(DEBUG5, HADOOP_FDW_NAME ": built statement: \"%s\"", sql.data);
+
 	rel = heap_open(foreigntableid, NoLock);
 	table = GetForeignTable(RelationGetRelid(rel));
 
@@ -1212,8 +1225,13 @@ hadoopGetForeignPlan(PlannerInfo *root,
 
 	appendStringInfo(&sql, "%s", relname);
 	if (remote_conds)
+	{
+		elog(DEBUG3, HADOOP_FDW_NAME ": remote conditions found for pushdown");
 		appendWhereClause(&sql, root, baserel, remote_conds,
 						  true, &params_list);
+	}
+
+	elog(DEBUG1, HADOOP_FDW_NAME ": built Hive SQL:\n\n%s\n", sql.data);
 
 	fdw_private = list_make2(makeString(sql.data),
 							 retrieved_attrs);
@@ -1226,8 +1244,6 @@ hadoopGetForeignPlan(PlannerInfo *root,
 #else
 	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private);
 #endif
-
-	elog(DEBUG2, "End: hadoopGetForeignPlan");
 }
 
 /*
@@ -1242,7 +1258,8 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 
 	SIGINTInterruptCheckProcess();
 
-	elog(DEBUG2, "Start: hadoopGetForeignRelSize");
+	elog(DEBUG3, HADOOP_FDW_NAME
+		 ": get foreign rel size for relation ID %d", foreigntableid);
 
 	baserel->rows = 1000;
 
@@ -1284,7 +1301,6 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 					   &fpinfo->attrs_used);
 	}
 
-	elog(DEBUG2, "End: hadoopGetForeignRelSize");
 }
 #endif
 
@@ -1399,6 +1415,9 @@ hadoopImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 			values[i] = ConvertStringToCString((jobject) (*env)->GetObjectArrayElement(env, java_rowarray, i));
 			appendStringInfo(&buf, "%s", values[i]);
 			result = lappend(result, pstrdup(buf.data));
+
+			elog(DEBUG1, HADOOP_FDW_NAME "DDL: %.*s\n", (int) buf.len, buf.data);
+
 		}
 
 		for (j = 0; j < NumberOfRows; j++)
