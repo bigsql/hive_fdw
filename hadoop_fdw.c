@@ -1231,7 +1231,7 @@ hadoopGetForeignPlan(PlannerInfo *root,
 						  true, &params_list);
 	}
 
-	elog(DEBUG1, HADOOP_FDW_NAME ": built Hive SQL:\n\n%s\n", sql.data);
+	elog(DEBUG1, HADOOP_FDW_NAME ": built HiveQL:\n\n%s\n", sql.data);
 
 	fdw_private = list_make2(makeString(sql.data),
 							 retrieved_attrs);
