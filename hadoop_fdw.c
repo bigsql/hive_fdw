@@ -1120,9 +1120,11 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 	/* Create a ForeignPath node and add it as only possible path */
 #if PG_VERSION_NUM < 90500
 	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL));
-#else
+#elif PG_VERSION_NUM < 90600
 	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
-#endif
+#else
+	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, NULL, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
+#endif /* PG_VERSION_NUM < 90500 */
 }
 
 /*
@@ -1291,8 +1293,13 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	 */
 	fpinfo->attrs_used = NULL;
 
+#if (PG_VERSION_NUM < 90600)
 	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid,
 				   &fpinfo->attrs_used);
+#else
+	pull_varattnos((Node *) baserel->reltarget->exprs, baserel->relid,
+				   &fpinfo->attrs_used);
+#endif /* PG_VERSION_NUM < 90600 */
 	foreach(lc, fpinfo->local_conds)
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
