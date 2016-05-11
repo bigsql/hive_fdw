@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *                foreign-data wrapper for HADOOP 
+ *                foreign-data wrapper for HADOOP
  *
  * IDENTIFICATION
- *                hadoop_fdw/hadoop_fdw--2.0.sql
+ *                hadoop_fdw/hadoop_fdw--2.1.0.sql
  *
  *-------------------------------------------------------------------------
  */
