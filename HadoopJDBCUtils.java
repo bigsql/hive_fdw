@@ -322,10 +322,12 @@ public class HadoopJDBCUtils
 						column_type[total_col] = "timestamp";
 					else if (field.compareTo("DECIMAL") == 0)
 						column_type[total_col] = "decimal";
-					else if (field.compareTo("BINARY") == 0)
-						column_type[total_col] = "bytea";
-					else if (field.compareTo("TIMESTAMP") == 0)
-						column_type[total_col] = "timestamp";
+					else if (field.compareTo("DATE") == 0)
+						column_type[total_col] = "date";
+					else if (field.compareTo("CHAR") == 0)
+						column_type[total_col] = "char";
+					else if (field.compareTo("VARCHAR") == 0)
+                                                column_type[total_col] = "varchar";
 					else	/* We need to error out for unsupported data types */
 					{
 						System.out.println("Unsupported Hive Data Type "+ field);
