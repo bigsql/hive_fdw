@@ -34,6 +34,8 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 #include "utils/array.h"
+#include "optimizer/tlist.h"
+#include "optimizer/var.h"
 
 typedef struct foreign_glob_cxt
 {
@@ -49,6 +51,11 @@ typedef struct deparse_expr_cxt
 	List		**params_list;       /* exprs that will become remote Params */
 } deparse_expr_cxt;
 
+#define REL_ALIAS_PREFIX	"r"
+/* Handy macro to add relation name qualification */
+#define ADD_REL_QUALIFIER(buf, varno)	\
+		appendStringInfo((buf), "%s%d.", REL_ALIAS_PREFIX, (varno))
+
 static bool foreign_expr_walker(Node *node, foreign_glob_cxt *glob_cxt);
 static bool is_builtin(Oid oid);
 
@@ -62,12 +69,34 @@ static void deparseOpExpr(OpExpr *node, deparse_expr_cxt *context);
 static void deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context);
 static void deparseNullTest(NullTest *node, deparse_expr_cxt *context);
 static void deparseColumnRef(StringInfo buf, int varno, int varattno,
-				 PlannerInfo *root);
+				 PlannerInfo *root, bool qualify_col);
 static void deparseRelabelType(RelabelType *node, deparse_expr_cxt *context);
 static void deparseScalarArrayOpExpr(ScalarArrayOpExpr *node,
 						 deparse_expr_cxt *context);
 static void deparseTargetList(StringInfo buf, PlannerInfo *root, Index rtindex,
-				  Relation rel, Bitmapset *attrs_used, List **retrieved_attrs);
+							  Relation rel, Bitmapset *attrs_used,
+							  bool qualify_col, List **retrieved_attrs);
+static void appendConditions(List *exprs, deparse_expr_cxt *context);
+static void
+deparseExplicitTargetList(List *tlist, List **retrieved_attrs,
+						  deparse_expr_cxt *context);
+void
+appendWhereClause(PlannerInfo *root,
+				  RelOptInfo *baserel,
+				  List *exprs,
+				  bool is_first,
+				  List **params,
+				  deparse_expr_cxt *context);
+void
+deparseFromExprForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *foreignrel,
+					  bool use_alias, List **params_list);
+void
+deparseSelectSql(PlannerInfo *root,
+				 RelOptInfo *baserel,
+				 Bitmapset *attrs_used,
+				 List **retrieved_attrs,
+				 List *tlist,
+				 deparse_expr_cxt *context);
 
 static bool
 foreign_expr_walker(Node *node, foreign_glob_cxt *glob_cxt)
@@ -81,9 +110,12 @@ foreign_expr_walker(Node *node, foreign_glob_cxt *glob_cxt)
 			{
 				Var	*var = (Var *) node;
 
-				if (!((var->varno == glob_cxt->foreignrel->relid &&
-					   var->varlevelsup == 0))) {
-					return false;
+				if (bms_is_member(var->varno, glob_cxt->foreignrel->relids) &&
+					var->varlevelsup == 0)
+				{
+					if (var->varattno < 0 &&
+						var->varattno != SelfItemPointerAttributeNumber)
+						return false;
 				}
 			}
 			break;
@@ -252,30 +284,43 @@ is_builtin(Oid oid)
  * returned to *retrieved_attrs.
  */
 void
-deparseSelectSql(StringInfo buf,
-				 PlannerInfo *root,
+deparseSelectSql(PlannerInfo *root,
 				 RelOptInfo *baserel,
 				 Bitmapset *attrs_used,
-				 List **retrieved_attrs)
+				 List **retrieved_attrs,
+				 List *tlist,
+				 deparse_expr_cxt *context)
 {
-	RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
-	Relation	rel;
 
-	/*
-	 * Core code already has some lock on each rel being planned, so we can
-	 * use NoLock here.
-	 */
-	rel = heap_open(rte->relid, NoLock);
-
+	StringInfo buf = context->buf;
 	/*
 	 * Construct SELECT list
 	 */
 	appendStringInfoString(buf, "SELECT ");
-	deparseTargetList(buf, root, baserel->relid, rel, attrs_used,
-					  retrieved_attrs);
 
-	/* Construct FROM clause outside of this function..  */
-	heap_close(rel, NoLock);
+	if (baserel->reloptkind == RELOPT_JOINREL)
+	{
+		/* For a join relation use the input tlist */
+		deparseExplicitTargetList(tlist, retrieved_attrs, context);
+	}
+	else
+	{
+		RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
+		Relation	rel;
+
+		/*
+		 * Core code already has some lock on each rel being planned, so we
+		 * can use NoLock here.
+		 */
+		rel = heap_open(rte->relid, NoLock);
+
+		deparseTargetList(buf, root, baserel->relid, rel, attrs_used,
+						  false, retrieved_attrs);
+
+		/* Construct FROM clause outside of this function..  */
+		heap_close(rel, NoLock);
+	}
+
 }
 
 /*
@@ -290,6 +335,7 @@ deparseTargetList(StringInfo buf,
 				  Index rtindex,
 				  Relation rel,
 				  Bitmapset *attrs_used,
+				  bool qualify_col,
 				  List **retrieved_attrs)
 {
 	TupleDesc	tupdesc = RelationGetDescr(rel);
@@ -337,7 +383,7 @@ deparseTargetList(StringInfo buf,
 					appendStringInfoString(buf, ", ");
 				first = false;
 
-				deparseColumnRef(buf, rtindex, i, root);
+				deparseColumnRef(buf, rtindex, i, root, qualify_col);
 			}
 			*retrieved_attrs = lappend_int(*retrieved_attrs, i);
 		}
@@ -378,27 +424,21 @@ is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 	return true;
 }
 
-
 void
-appendWhereClause(StringInfo buf,
-				  PlannerInfo *root,
+appendWhereClause(PlannerInfo *root,
 				  RelOptInfo *baserel,
 				  List *exprs,
 				  bool is_first,
-				  List **params)
+				  List **params,
+				  deparse_expr_cxt *context)
 {
-	deparse_expr_cxt context;
+	StringInfo buf;
 	ListCell   *lc;
 
 	if (params)
 		*params = NIL;			/* initialize result list to empty */
 
-	/* Set up context struct for recursion */
-	context.root = root;
-	context.foreignrel = baserel;
-	context.buf = buf;
-	context.params_list = params;
-
+	buf = context->buf;
 	foreach(lc, exprs)
 	{
 		RestrictInfo *ri = (RestrictInfo *) lfirst(lc);
@@ -410,7 +450,7 @@ appendWhereClause(StringInfo buf,
 			appendStringInfoString(buf, " AND ");
 
 		appendStringInfoChar(buf, '(');
-		deparseExpr(ri->clause, &context);
+		deparseExpr(ri->clause, context);
 		appendStringInfoChar(buf, ')');
 
 		is_first = false;
@@ -540,14 +580,16 @@ static void
 deparseVar(Var *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
+	bool		qualify_col = (context->foreignrel->reloptkind == RELOPT_JOINREL);
 
 	elog(DEBUG4, HADOOP_FDW_NAME ": pushdown check for T_Var");
 
-	if (node->varno == context->foreignrel->relid &&
+	if (bms_is_member(node->varno, context->foreignrel->relids) &&
 		node->varlevelsup == 0)
 	{
 		/* Var belongs to foreign table */
-		deparseColumnRef(buf, node->varno, node->varattno, context->root);
+		deparseColumnRef(buf, node->varno, node->varattno, context->root,
+						 qualify_col);
 	}
 	else
 	{
@@ -986,7 +1028,7 @@ deparseStringLiteral(StringInfo buf, const char *val)
 }
 
 static void
-deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
+deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root, bool qualify_col)
 {
 	RangeTblEntry *rte;
 	char	   *colname = NULL;
@@ -1022,5 +1064,251 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root)
 	if (colname == NULL)
 		colname = get_relid_attribute_name(rte->relid, varattno);
 
+		if (qualify_col)
+			ADD_REL_QUALIFIER(buf, varno);
+
 	appendStringInfoString(buf, quote_identifier(colname));
+}
+
+/* Output join name for given join type */
+extern const char *
+get_jointype_name(JoinType jointype)
+{
+	switch (jointype)
+	{
+		case JOIN_INNER:
+			return "INNER";
+
+		case JOIN_LEFT:
+			return "LEFT";
+
+		case JOIN_RIGHT:
+			return "RIGHT";
+
+		case JOIN_FULL:
+			return "FULL";
+
+		default:
+			/* Shouldn't come here, but protect from buggy code. */
+			elog(ERROR, "unsupported join type %d", jointype);
+	}
+
+	/* Keep compiler happy */
+	return NULL;
+}
+
+void
+deparseFromExprForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *foreignrel,
+					  bool use_alias, List **params_list)
+{
+	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) foreignrel->fdw_private;
+
+	if (foreignrel->reloptkind == RELOPT_JOINREL)
+	{
+		RelOptInfo *rel_o = fpinfo->outerrel;
+		RelOptInfo *rel_i = fpinfo->innerrel;
+		StringInfoData join_sql_o;
+		StringInfoData join_sql_i;
+
+		/* Deparse outer relation */
+		initStringInfo(&join_sql_o);
+		deparseFromExprForRel(&join_sql_o, root, rel_o, true, params_list);
+
+		/* Deparse inner relation */
+		initStringInfo(&join_sql_i);
+		deparseFromExprForRel(&join_sql_i, root, rel_i, true, params_list);
+
+		/*
+		 * For a join relation FROM clause entry is deparsed as
+		 *
+		 * ((outer relation) <join type> (inner relation) ON (joinclauses)
+		 */
+		appendStringInfo(buf, "(%s %s JOIN %s ON ", join_sql_o.data,
+					   get_jointype_name(fpinfo->jointype), join_sql_i.data);
+
+		/* Append join clause; (TRUE) if no join clause */
+		if (fpinfo->joinclauses)
+		{
+			deparse_expr_cxt context;
+
+			context.buf = buf;
+			context.foreignrel = foreignrel;
+			context.root = root;
+			context.params_list = params_list;
+
+			appendStringInfo(buf, "(");
+			appendConditions(fpinfo->joinclauses, &context);
+			appendStringInfo(buf, ")");
+		}
+		else
+			appendStringInfoString(buf, "(TRUE)");
+
+		/* End the FROM clause entry. */
+		appendStringInfo(buf, ")");
+	}
+	else
+	{
+		ForeignTable *table;
+		Relation	rel;
+		ListCell   *lc;
+		const char *relname = NULL;
+		RangeTblEntry *rte = planner_rt_fetch(foreignrel->relid, root);
+
+		rel = heap_open(rte->relid, NoLock);
+		table = GetForeignTable(RelationGetRelid(rel));
+
+		/*
+		 * Use value of FDW options if any, instead of the name of object itself.
+		 */
+		foreach(lc, table->options)
+		{
+			DefElem    *def = (DefElem *) lfirst(lc);
+
+			if (strcmp(def->defname, "table") == 0)
+				relname = defGetString(def);
+		}
+
+		appendStringInfo(buf, "%s", relname);
+
+		/*
+		 * Add a unique alias to avoid any conflict in relation names due to
+		 * pulled up subqueries in the query being built for a pushed down
+		 * join.
+		 */
+		if (use_alias)
+			appendStringInfo(buf, " %s%d", REL_ALIAS_PREFIX, foreignrel->relid);
+
+		heap_close(rel, NoLock);
+	}
+	return;
+}
+
+static void
+appendConditions(List *exprs, deparse_expr_cxt *context)
+{
+	ListCell   *lc;
+	bool		is_first = true;
+	StringInfo	buf = context->buf;
+
+	foreach(lc, exprs)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc);
+
+		/*
+		 * Extract clause from RestrictInfo, if required. See comments in
+		 * declaration of PgFdwRelationInfo for details.
+		 */
+		if (IsA(expr, RestrictInfo))
+		{
+			RestrictInfo *ri = (RestrictInfo *) expr;
+
+			expr = ri->clause;
+		}
+
+		/* Connect expressions with "AND" and parenthesize each condition. */
+		if (!is_first)
+			appendStringInfoString(buf, " AND ");
+
+		appendStringInfoChar(buf, '(');
+		deparseExpr(expr, context);
+		appendStringInfoChar(buf, ')');
+
+		is_first = false;
+	}
+}
+
+/*
+ * Build the targetlist for given relation to be deparsed as SELECT clause.
+ *
+ * The output targetlist contains the columns that need to be fetched from the
+ * foreign server for the given relation.
+ */
+List *
+build_tlist_to_deparse(RelOptInfo *foreignrel)
+{
+	List	   *tlist = NIL;
+	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) foreignrel->fdw_private;
+
+	/*
+	 * We require columns specified in foreignrel->reltarget->exprs and those
+	 * required for evaluating the local conditions.
+	 */
+#if (PG_VERSION_NUM < 90600)
+	tlist = add_to_flat_tlist(tlist, foreignrel->reltargetlist);
+	tlist = add_to_flat_tlist(tlist,
+							  pull_var_clause((Node *) fpinfo->local_conds,
+											  PVC_RECURSE_AGGREGATES,
+											  PVC_RECURSE_PLACEHOLDERS));
+#else
+	tlist = add_to_flat_tlist(tlist, foreignrel->reltarget->exprs);
+	tlist = add_to_flat_tlist(tlist,
+							  pull_var_clause((Node *) fpinfo->local_conds,
+											  PVC_RECURSE_PLACEHOLDERS));
+#endif /* PG_VERSION_NUM < 90600 */
+
+	return tlist;
+}
+
+static void
+deparseExplicitTargetList(List *tlist, List **retrieved_attrs,
+						  deparse_expr_cxt *context)
+{
+	ListCell   *lc;
+	StringInfo	buf = context->buf;
+	int			i = 0;
+
+	*retrieved_attrs = NIL;
+
+	foreach(lc, tlist)
+	{
+		TargetEntry *tle = (TargetEntry *) lfirst(lc);
+		Var		   *var;
+
+		/* Extract expression if TargetEntry node */
+		Assert(IsA(tle, TargetEntry));
+		var = (Var *) tle->expr;
+		/* We expect only Var nodes here */
+		Assert(IsA(var, Var));
+
+		if (i > 0)
+			appendStringInfoString(buf, ", ");
+		deparseVar(var, context);
+
+		*retrieved_attrs = lappend_int(*retrieved_attrs, i + 1);
+
+		i++;
+	}
+
+	if (i == 0)
+		appendStringInfoString(buf, "NULL");
+}
+
+extern void
+deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
+						List *remote_conds, List **retrieved_attrs, List **params_list,
+						hadoopFdwRelationInfo *fpinfo, List *fdw_scan_tlist)
+{
+	deparse_expr_cxt context;
+	/* Set up context struct for recursion */
+	context.root = root;
+	context.foreignrel = baserel;
+	context.buf = buf;
+	context.params_list = params_list;
+
+	deparseSelectSql(root, baserel, fpinfo->attrs_used,
+					 retrieved_attrs, fdw_scan_tlist, &context);
+	appendStringInfo(buf, "%s", " FROM ");
+
+	elog(DEBUG5, HADOOP_FDW_NAME ": built statement: \"%s\"", buf->data);
+
+	deparseFromExprForRel(buf, root, baserel,
+						  (baserel->reloptkind == RELOPT_JOINREL),
+						  params_list);
+
+	if (remote_conds)
+	{
+		elog(DEBUG3, HADOOP_FDW_NAME ": remote conditions found for pushdown");
+		appendWhereClause(root, baserel, remote_conds,
+						  true, params_list, &context);
+	}
 }

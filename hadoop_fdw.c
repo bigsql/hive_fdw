@@ -54,8 +54,10 @@
 
 #if PG_VERSION_NUM >= 90500
 #define HADOOP_FDW_IMPORT_API
+#define HADOOP_FDW_JOIN_API
 #else
 #undef HADOOP_FDW_IMPORT_API
+#undef HADOOP_FDW_JOIN_API
 #endif  /* PG_VERSION_NUM >= 90500 */
 
 
@@ -100,20 +102,6 @@ static struct hadoopFdwOption valid_options[] =
 	/* Sentinel */
 	{NULL, InvalidOid}
 };
-
-typedef struct hadoopFdwRelationInfo
-{
-	/* baserestrictinfo clauses, broken down into safe and unsafe subsets. */
-	List       *remote_conds;
-	List       *local_conds;
-
-	/* Bitmap of attr numbers we need to fetch from the remote server. */
-	Bitmapset  *attrs_used;
-
-	/* Cached catalog information. */
-	ForeignTable *table;
-	ForeignServer *server;
-} hadoopFdwRelationInfo;
 
 /*
  * FDW-specific information for ForeignScanState.fdw_state.
@@ -175,6 +163,17 @@ static hadoopFdwExecutionState *hadoopGetConnection(
 				char *svr_host,
 				int svr_port,
 				char *svr_schema);
+#ifdef HADOOP_FDW_JOIN_API
+static bool foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
+				JoinType jointype, RelOptInfo *outerrel, RelOptInfo *innerrel,
+				JoinPathExtraData *extra);
+static void hadoopGetForeignJoinPaths(PlannerInfo *root,
+							RelOptInfo *joinrel,
+							RelOptInfo *outerrel,
+							RelOptInfo *innerrel,
+							JoinType jointype,
+							JoinPathExtraData *extra);
+#endif /* HADOOP_FDW_JOIN_API */
 
 /*
  * Helper functions
@@ -444,7 +443,10 @@ hadoop_fdw_handler(PG_FUNCTION_ARGS)
 #ifdef HADOOP_FDW_IMPORT_API
 	fdwroutine->ImportForeignSchema = hadoopImportForeignSchema;
 #endif  /* HADOOP_FDW_IMPORT_API */
-
+#ifdef HADOOP_FDW_JOIN_API
+	/* Support functions for join push-down */
+	fdwroutine->GetForeignJoinPaths = hadoopGetForeignJoinPaths;
+#endif  /* HADOOP_FDW_JOIN_API */
 	pqsignal(SIGINT, SIGINTInterruptHandler);
 
 	PG_RETURN_POINTER(fdwroutine);
@@ -894,22 +896,35 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 	char	   *svr_host = NULL;
 	int			svr_port = 0;
 	Oid			foreigntableid;
-	ForeignTable *f_table = NULL;
 	jstring		name;
 
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
-
+	Oid serverid;
+#ifndef HADOOP_FDW_JOIN_API
+	ForeignTable *f_table = NULL;
+#endif /* HADOOP_FDW_JOIN_API */
 	SIGINTInterruptCheckProcess();
 
-	elog(DEBUG3, HADOOP_FDW_NAME ": begin foreign scan for relation ID %d",
-		 RelationGetRelid(node->ss.ss_currentRelation));
+#ifdef HADOOP_FDW_JOIN_API
+	serverid = intVal(list_nth(fsplan->fdw_private, 2));
+	if (fsplan->scan.scanrelid > 0)
+	{
+		elog(DEBUG3, HADOOP_FDW_NAME ": begin foreign scan for relation ID %d",
+			 RelationGetRelid(node->ss.ss_currentRelation));
 
-	/* Fetch options  */
+		/* Fetch options  */
+		foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
+
+	}
+	else
+		foreigntableid = intVal(list_nth(fsplan->fdw_private, 3));
+#else
 	foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
 	f_table = GetForeignTable(foreigntableid);
-
+	serverid = f_table->serverid;
+#endif /* HADOOP_FDW_JOIN_API */
 	hadoopGetTableOptions(foreigntableid, &svr_table, &svr_schema);
-	hadoopGetServerOptions(f_table->serverid,
+	hadoopGetServerOptions(serverid,
 						   &svr_querytimeout,
 						   &svr_maxheapsize,
 						   &svr_username,
@@ -987,6 +1002,7 @@ hadoopIterateForeignScan(ForeignScanState *node)
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	jobject		java_call = festate->java_call;
+	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 
 	/* Cleanup */
 	ExecClearTuple(slot);
@@ -1024,7 +1040,11 @@ hadoopIterateForeignScan(ForeignScanState *node)
 			values[i] = ConvertStringToCString((jobject) (*env)->GetObjectArrayElement(env, java_rowarray, i));
 		}
 
+	if (fsplan->scan.scanrelid > 0)
 		tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att), values);
+	else
+		tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_ScanTupleSlot->tts_tupleDescriptor), values);
+
 		ExecStoreTuple(tuple, slot, InvalidBuffer, false);
 		++(festate->NumberOfRows);
 
@@ -1056,11 +1076,16 @@ hadoopEndForeignScan(ForeignScanState *node)
 	char	   *close_result_cstring = NULL;
 	hadoopFdwExecutionState *festate = (hadoopFdwExecutionState *) node->fdw_state;
 	jobject		java_call = festate->java_call;
+	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 
 	SIGINTInterruptCheckProcess();
 
-	elog(DEBUG3, HADOOP_FDW_NAME ": end foreign scan for relation ID %d",
-		 RelationGetRelid(node->ss.ss_currentRelation));
+	if (fsplan->scan.scanrelid > 0)
+	{
+		elog(DEBUG3, HADOOP_FDW_NAME ": end foreign scan for relation ID %d",
+			 RelationGetRelid(node->ss.ss_currentRelation));
+	}
+
 
 	HadoopJDBCUtilsClass = (*env)->FindClass(env, "HadoopJDBCUtils");
 	if (HadoopJDBCUtilsClass == NULL)
@@ -1161,21 +1186,45 @@ hadoopGetForeignPlan(PlannerInfo *root,
 	List	   *retrieved_attrs;
 	StringInfoData sql;
 	ListCell   *lc;
+	List	   *fdw_scan_tlist = NIL;
 
-	ForeignTable *table;
-	Relation	rel;
-	const char *relname = NULL;
 	Index		scan_relid = baserel->relid;
+#ifndef HADOOP_FDW_JOIN_API
 	ForeignTable *f_table;
-
+#endif /* HADOOP_FDW_JOIN_API */
 	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) baserel->fdw_private;
 
 	elog(DEBUG3, HADOOP_FDW_NAME
 		 ": get foreign plan for relation ID %d", foreigntableid);
 
+	/*
+	 * For base relations, set scan_relid as the relid of the relation. For
+	 * other kinds of relations set it to 0.
+	 */
+	if (baserel->reloptkind == RELOPT_BASEREL ||
+		baserel->reloptkind == RELOPT_OTHER_MEMBER_REL)
+		scan_relid = baserel->relid;
+	else
+	{
+		scan_relid = 0;
+
+		/*
+		 * create_scan_plan() and create_foreignscan_plan() pass
+		 * rel->baserestrictinfo + parameterization clauses through
+		 * scan_clauses. For a join rel->baserestrictinfo is NIL and we are
+		 * not considering parameterization right now, so there should be no
+		 * scan_clauses for a joinrel.
+		 */
+		Assert(!scan_clauses);
+	}
+
+#ifdef HADOOP_FDW_JOIN_API
+	JVMInitialization(baserel->serverid);
+#else
+	Assert(foreigntableid);
 	f_table = GetForeignTable(foreigntableid);
 	JVMInitialization(f_table->serverid);
-
+#endif /* HADOOP_FDW_JOIN_API */
 	foreach(lc, scan_clauses)
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
@@ -1199,50 +1248,56 @@ hadoopGetForeignPlan(PlannerInfo *root,
 		}
 	}
 
+	if (baserel->reloptkind == RELOPT_JOINREL)
+	{
+		/* For a join relation, get the conditions from fdw_private structure */
+		remote_conds = fpinfo->remote_conds;
+		local_exprs = fpinfo->local_conds;
+
+		/* Build the list of columns to be fetched from the foreign server. */
+		fdw_scan_tlist = build_tlist_to_deparse(baserel);
+
+		/*
+		 * Ensure that the outer plan produces a tuple whose descriptor
+		 * matches our scan tuple slot. This is safe because all scans and
+		 * joins support projection, so we never need to insert a Result node.
+		 * Also, remove the local conditions from outer plan's quals, lest
+		 * they will be evaluated twice, once by the local plan and once by
+		 * the scan.
+		 */
+	}
 	/*
 	 * Build the query string to be sent for execution, and identify
 	 * expressions to be sent as parameters.
 	 */
 	initStringInfo(&sql);
-
-	deparseSelectSql(&sql, root, baserel, fpinfo->attrs_used,
-					 &retrieved_attrs);
-	appendStringInfo(&sql, "%s", " FROM ");
-
-	elog(DEBUG5, HADOOP_FDW_NAME ": built statement: \"%s\"", sql.data);
-
-	rel = heap_open(foreigntableid, NoLock);
-	table = GetForeignTable(RelationGetRelid(rel));
-
-	/*
-	 * Use value of FDW options if any, instead of the name of object itself.
-	 */
-	foreach(lc, table->options)
-	{
-		DefElem    *def = (DefElem *) lfirst(lc);
-
-		if (strcmp(def->defname, "table") == 0)
-			relname = defGetString(def);
-	}
-
-	appendStringInfo(&sql, "%s", relname);
-	if (remote_conds)
-	{
-		elog(DEBUG3, HADOOP_FDW_NAME ": remote conditions found for pushdown");
-		appendWhereClause(&sql, root, baserel, remote_conds,
-						  true, &params_list);
-	}
+	deparseSelectStmtForRel(&sql, root, baserel, remote_conds, &retrieved_attrs, &params_list,
+							fpinfo, fdw_scan_tlist);
 
 	elog(DEBUG1, HADOOP_FDW_NAME ": built HiveQL:\n\n%s\n", sql.data);
 
+#ifdef HADOOP_FDW_JOIN_API
+	/*
+	 * When it is a join relation the foreigntableid passed to hadoopGetForeignPlan
+	 * is zero. We cannot obtain the serverid from this relation so we add the serverid
+	 * to the fdw_private here so we can use this in hadoopGetForeignPaln. Likewise
+	 * we also need to know the schema to use when we obtain the Hive connection
+	 * we add the foreigntableid as well so that we can get the table options
+	 * from this foreigntableid. Since it is assumed that all the relations
+	 * involved in the joins belong to the same server and to the same schema it is
+	 * irrelevant which of the foreign tables makes it in the fdw_private list.
+	 */
+	fdw_private = list_make4(makeString(sql.data),
+							 retrieved_attrs,
+							 makeInteger(baserel->serverid),
+							 makeInteger(fpinfo->foreigntableid));
+#else
 	fdw_private = list_make2(makeString(sql.data),
 							 retrieved_attrs);
-
-	heap_close(rel, NoLock);
-
+#endif /* HADOOP_FDW_JOIN_API */
 	/* Create the ForeignScan node */
 #if PG_VERSION_NUM >= 90500
-	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private, NIL, NIL, (Plan *) NIL);
+	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private, fdw_scan_tlist, NIL, (Plan *) NIL);
 #else
 	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private);
 #endif
@@ -1267,6 +1322,9 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 
 	fpinfo = (hadoopFdwRelationInfo *) palloc0(sizeof(hadoopFdwRelationInfo));
 	baserel->fdw_private = (void *) fpinfo;
+
+	/* Base foreign tables need to be push down always. */
+	fpinfo->pushdown_safe = true;
 
 	/* Look up foreign-table catalog info. */
 	fpinfo->table = GetForeignTable(foreigntableid);
@@ -1567,3 +1625,248 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	(*env)->DeleteLocalRef(env, initialize_result);
 	return festate;
 }
+
+#ifdef HADOOP_FDW_JOIN_API
+/*
+ * hadoopGetForeignJoinPaths
+ *		Add possible ForeignPath to joinrel, if join is safe to push down.
+ */
+static void
+hadoopGetForeignJoinPaths(PlannerInfo *root,
+							RelOptInfo *joinrel,
+							RelOptInfo *outerrel,
+							RelOptInfo *innerrel,
+							JoinType jointype,
+							JoinPathExtraData *extra)
+{
+	hadoopFdwRelationInfo *fpinfo;
+	Cost		startup_cost = 0;
+	Cost		total_cost = 0;
+	Path	   *epq_path;		/* Path to create plan to be executed when
+								 * EvalPlanQual gets triggered. */
+
+	elog(DEBUG3, HADOOP_FDW_NAME
+		 ": get foreign join paths");
+
+	/*
+	 * Skip if this join combination has been considered already.
+	 */
+	if (joinrel->fdw_private)
+		return;
+
+	/*
+	 * Create unfinished hadoopFdwRelationInfo entry which is used to indicate
+	 * that the join relation is already considered, so that we won't waste
+	 * time in judging safety of join pushdown and adding the same paths again
+	 * if found safe. Once we know that this join can be pushed down, we fill
+	 * the entry.
+	 */
+	fpinfo = (hadoopFdwRelationInfo *) palloc0(sizeof(hadoopFdwRelationInfo));
+	fpinfo->pushdown_safe = false;
+	joinrel->fdw_private = fpinfo;
+	/* attrs_used is only for base relations. */
+	fpinfo->attrs_used = NULL;
+
+	epq_path = NULL;
+
+	if (!foreign_join_ok(root, joinrel, jointype, outerrel, innerrel, extra))
+	{
+		/* Free path required for EPQ if we copied one; we don't need it now */
+		if (epq_path)
+			pfree(epq_path);
+		return;
+	}
+
+	fpinfo->server = GetForeignServer(joinrel->serverid);
+
+	/* Now update this information in the joinrel */
+	joinrel->rows = 1000;
+
+	/*
+	 * Create a new join path and add it to the joinrel which represents a
+	 * join between foreign tables.
+	 */
+#if PG_VERSION_NUM < 90500
+	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, joinrel->rows, startup_cost, total_cost, NIL, NULL, NIL));
+#elif PG_VERSION_NUM < 90600
+	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, joinrel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
+#else
+	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, NULL, joinrel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
+#endif /* PG_VERSION_NUM < 90500 */
+
+}
+
+/*
+ * Assess whether the join between inner and outer relations can be pushed down
+ * to the foreign server. As a side effect, save information we obtain in this
+ * function to hadoopFdwRelationInfo passed in.
+ *
+ * Joins that satisfy conditions below are safe to push down.
+ *
+ * 1) Join type is INNER or OUTER (one of LEFT/RIGHT/FULL)
+ * 2) Both outer and inner portions are safe to push-down
+ * 3) All join conditions are safe to push down
+ * 4) No relation has local filter (this can be relaxed for INNER JOIN, if we
+ *	  can move unpushable clauses upwards in the join tree).
+ */
+static bool
+foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
+				RelOptInfo *outerrel, RelOptInfo *innerrel,
+				JoinPathExtraData *extra)
+{
+	hadoopFdwRelationInfo *fpinfo;
+	hadoopFdwRelationInfo *fpinfo_o;
+	hadoopFdwRelationInfo *fpinfo_i;
+	ListCell   *lc;
+	List	   *joinclauses;
+	List	   *otherclauses;
+
+	/*
+	 * We support pushing down INNER, LEFT, RIGHT and FULL OUTER joins.
+	 * Constructing queries representing SEMI and ANTI joins is hard, hence
+	 * not considered right now.
+	 */
+	if (jointype != JOIN_INNER && jointype != JOIN_LEFT &&
+		jointype != JOIN_RIGHT && jointype != JOIN_FULL)
+		return false;
+
+	/*
+	 * If either of the joining relations is marked as unsafe to pushdown, the
+	 * join can not be pushed down.
+	 */
+	fpinfo = (hadoopFdwRelationInfo *) joinrel->fdw_private;
+	fpinfo_o = (hadoopFdwRelationInfo *) outerrel->fdw_private;
+	fpinfo_i = (hadoopFdwRelationInfo *) innerrel->fdw_private;
+	fpinfo->foreigntableid = fpinfo_o->table->relid;
+	if (!fpinfo_o || !fpinfo_o->pushdown_safe ||
+		!fpinfo_i || !fpinfo_i->pushdown_safe)
+		return false;
+
+	/*
+	 * If joining relations have local conditions, those conditions are
+	 * required to be applied before joining the relations. Hence the join can
+	 * not be pushed down.
+	 */
+	if (fpinfo_o->local_conds || fpinfo_i->local_conds)
+		return false;
+
+	/* Separate restrict list into join quals and quals on join relation */
+	if (IS_OUTER_JOIN(jointype))
+		extract_actual_join_clauses(extra->restrictlist, &joinclauses, &otherclauses);
+	else
+	{
+		/*
+		 * Unlike an outer join, for inner join, the join result contains only
+		 * the rows which satisfy join clauses, similar to the other clause.
+		 * Hence all clauses can be treated as other quals. This helps to push
+		 * a join down to the foreign server even if some of its join quals
+		 * are not safe to pushdown.
+		 */
+		otherclauses = extract_actual_clauses(extra->restrictlist, false);
+		joinclauses = NIL;
+	}
+
+	/* Save the join clauses, for later use. */
+	fpinfo->joinclauses = joinclauses;
+
+	/* Join quals must be safe to push down. */
+	foreach(lc, joinclauses)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc);
+
+		if (!is_foreign_expr(root, joinrel, expr))
+			return false;
+	}
+
+	/* Other clauses are applied after the join has been performed and thus
+	 * need not be all pushable. We will push those which can be pushed to
+	 * reduce the number of rows fetched from the foreign server. Rest of them
+	 * will be applied locally after fetching join result. Add them to fpinfo
+	 * so that other joins involving this joinrel will know that this joinrel
+	 * has local clauses.
+	 */
+	foreach(lc, otherclauses)
+	{
+		Expr	   *expr = (Expr *) lfirst(lc);
+
+		if (!is_foreign_expr(root, joinrel, expr))
+			fpinfo->local_conds = lappend(fpinfo->local_conds, expr);
+		else
+			fpinfo->remote_conds = lappend(fpinfo->remote_conds, expr);
+	}
+
+	fpinfo->outerrel = outerrel;
+	fpinfo->innerrel = innerrel;
+	fpinfo->jointype = jointype;
+
+	/*
+	 * Pull the other remote conditions from the joining relations into join
+	 * clauses or other remote clauses (remote_conds) of this relation wherever
+	 * possible. This avoids building subqueries at every join step, which is
+	 * not currently supported by the deparser logic.
+	 *
+	 * For an inner join, clauses from both the relations are added to the
+	 * other remote clauses. For LEFT and RIGHT OUTER join, the clauses from the
+	 * outer side are added to remote_conds since those can be evaluated after
+	 * the join is evaluated. The clauses from inner side are added to the
+	 * joinclauses, since they need to evaluated while constructing the join.
+	 *
+	 * For a FULL OUTER JOIN, the other clauses from either relation can not be
+	 * added to the joinclauses or remote_conds, since each relation acts as an
+	 * outer relation for the other. Consider such full outer join as
+	 * unshippable because of the reasons mentioned above in this comment.
+	 *
+	 * The joining sides can not have local conditions, thus no need to test
+	 * shippability of the clauses being pulled up.
+	 */
+	switch (jointype)
+	{
+		case JOIN_INNER:
+			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
+										  list_copy(fpinfo_i->remote_conds));
+			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
+										  list_copy(fpinfo_o->remote_conds));
+			break;
+
+		case JOIN_LEFT:
+			fpinfo->joinclauses = list_concat(fpinfo->joinclauses,
+										  list_copy(fpinfo_i->remote_conds));
+			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
+										  list_copy(fpinfo_o->remote_conds));
+			break;
+
+		case JOIN_RIGHT:
+			fpinfo->joinclauses = list_concat(fpinfo->joinclauses,
+										  list_copy(fpinfo_o->remote_conds));
+			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
+										  list_copy(fpinfo_i->remote_conds));
+			break;
+
+		case JOIN_FULL:
+			if (fpinfo_i->remote_conds || fpinfo_o->remote_conds)
+				return false;
+			break;
+
+		default:
+			/* Should not happen, we have just check this above */
+			elog(ERROR, "unsupported join type %d", jointype);
+	}
+
+	/*
+	 * For an inner join, as explained above all restrictions can be treated
+	 * alike. Treating the pushed down conditions as join conditions allows a
+	 * top level full outer join to be deparsed without requiring subqueries.
+	 */
+	if (jointype == JOIN_INNER)
+	{
+		Assert(!fpinfo->joinclauses);
+		fpinfo->joinclauses = fpinfo->remote_conds;
+		fpinfo->remote_conds = NIL;
+	}
+
+	/* Mark that this join can be pushed down safely */
+	fpinfo->pushdown_safe = true;
+
+	return true;
+}
+#endif /* HADOOP_FDW_JOIN_API */
