@@ -360,45 +360,9 @@ postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
  11-1011 |    299160
 (3 rows)
 ```
-###
 
-Supports IMPORT FOREIGN SCHEMA feature
+## Key Features ##
 
-Here are some examples:
+- [*IMPORT FOREIGN SCHEMA*](IMPORT_FOREIGN_SCHEMA.md)
+- [*JOIN PUSHDOWN*](JOIN_PUSHDOWN.md)
 
-```sql
--- IMPORT hadoop test_schema to the local SCHEMA.
-IMPORT FOREIGN SCHEMA test_schema
-    FROM SERVER hadoop_server INTO test_schema;
-
--- IMPORT only test_tab1, test_tab2 from hadoop test_schema to the local
--- SCHEMA.
-IMPORT FOREIGN SCHEMA test_schema
-    LIMIT TO (test_tab1, test_tab2)
-    FROM SERVER hadoop_server INTO test_schema;
-
--- IMPORT all other objects from the hadoop test_schema SCHEMA EXCEPT
--- test_tab1 and test_tab2.
-IMPORT FOREIGN SCHEMA test_schema
-    EXCEPT (test_tab1, test_tab2)
-    FROM SERVER hadoop_server INTO test_schema;
-```
-
-Provides JOIN push down support
-
-Here are some examples:
-
-```sql
--- Evaluate the JOIN condition (a.dept_id=b.dept_id) on the Hive server.
-SELECT a.id,a.name,a.doj,b.DEPT
-    FROM TEST_SCHEMA.COMPANY a JOIN TEST_SCHEMA.DEPARTMENT b
-        ON (a.dept_id=b.dept_id);
--- Assume TAB3 is not a Hive (foreign) table. The JOIN of TAB1 with
--- TAB2 is evaluated on the Hive server and the JOIN with TAB3 is
--- evaluated on the PostgreSQL server.
-SELECT t1.b, t3.e FROM TEST_SCHEMA.TAB1 t1
-    LEFT OUTER JOIN TAB3 t3
-        ON t1.b = t3.e
-    JOIN TEST_SCHEMA.TAB2 t2
-        ON t1.a = t2.c;
-```
