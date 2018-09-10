@@ -1,7 +1,7 @@
 HADOOP_FDW
 ==========
 
-Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 9.5.
+Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 10.
 
 ## Prepare
 
