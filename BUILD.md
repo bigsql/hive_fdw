@@ -10,11 +10,6 @@ requirements for this FDW are a JDK (we test with JDK 8) and a set of
 Hive client JAR files for the Hadoop distribution you are connecting
 with.
 
-## Install
-
-This FDW is included in the BigSQL by PostgreSQL distribution.  All you
-have to do is follow the usage instructions below.
-
 ## Building from Source
 
 First, download the source code under the contrib subdirectory of the
@@ -37,11 +32,12 @@ USE_PGXS=1 make install # with sudo if necessary
 
 ## To execute the FDW
 
-1) Set the environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HADOOP_JDBC_CLASSPATH before starting up PG.These      environment variables are read at the JVM initialisation time.
+1) Set the environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HADOOP_FDW_CLASSPATH before starting up PG.
+These environment variables are read at JVM initialization time.
 
-    PGHOME = Path to the PostgreSQL installation. Considering PostgreSQL is installed under /usr/local/pgsql/ the $PGHOME is /usr/local/pgsql/
+    PGHOME = Path to the PostgreSQL installation. 
     HIVECLIENT_JAR_HOME = The path containing the Hive JDBC client jar files required for the FDW to run successfully.
-    HADOOP_JDBC_CLASSPATH = .:$(echo $HIVECLIENT_JAR_HOME/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar
+    HADOOP_FDW_CLASSPATH = .:$(echo $HIVECLIENT_JAR_HOME/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar
 
 ## Usage
 

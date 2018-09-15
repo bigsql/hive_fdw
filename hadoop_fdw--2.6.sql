@@ -3,7 +3,7 @@
  *                foreign-data wrapper for HADOOP
  *
  * IDENTIFICATION
- *                hadoop_fdw/hadoop_fdw--2.5.sql
+ *                hadoop_fdw/hadoop_fdw--2.6.sql
  *
  *-------------------------------------------------------------------------
  */
