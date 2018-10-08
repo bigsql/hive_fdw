@@ -8,7 +8,7 @@
  * cases we also need to translate the function name into something
  * which is understood and accepted by Hive
  *
- * Copyright (c) 2012-2013, BigSQL Development Group
+ * Copyright (c) 2012-2018, BigSQL
  *
  * IDENTIFICATION
  *                hadoop_fdw/src/hive_funcs.c

@@ -3,7 +3,7 @@
  * hadoop_fdw.h
  *                Foreign-data wrapper for Hadoop
  *
- * Copyright (c) 2012-2013, BigSQL Development Group
+ * Copyright (c) 2012-2018, BigSQL
  * Portions Copyright (c) 2012-2013, PostgreSQL Global Development Group
  *
  * IDENTIFICATION

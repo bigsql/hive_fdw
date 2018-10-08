@@ -8,7 +8,7 @@
  * well as functions to construct the query text to be sent.  We only 
  * need deparse logic for node types that we consider safe to send.
  *
- * Copyright (c) 2012-2013, BigSQL Development Group
+ * Copyright (c) 2012-2018, BigSQL
  * Portions Copyright (c) 2012, PostgreSQL Global Development Group
  *
  * IDENTIFICATION

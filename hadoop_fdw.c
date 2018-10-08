@@ -2,7 +2,7 @@
  *
  * PostgreSQL Foreign Data Wrapper for Hadoop
  *
- * Copyright (c) 2014-2016, BigSQL
+ * Copyright (c) 2014-2018, BigSQL
  * Portions Copyright (c) 2012-2015, PostgreSQL Global Development Group & Others
  *
  * IDENTIFICATION
