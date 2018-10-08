@@ -660,15 +660,11 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 		iterator_result_type = ARR_ELEMTYPE(arr);
 
 		/* Create an iterator to step through the array */
-#if PG_VERSION_NUM >= 90500
 		array_iterator = array_create_iterator(arr, 0, NULL);
-#else
-		array_iterator = array_create_iterator(arr, 0);
-#endif
-
 		iterate = true;
 		isarray = true;
 		getTypeOutputInfo(iterator_result_type, &typoutput, &typIsVarlena);
+
 		/* Get the first value to seed the do..while loop below */
 		array_iterate(array_iterator, &value, &isnull);
 
@@ -1233,18 +1229,10 @@ build_tlist_to_deparse(RelOptInfo *foreignrel)
 	 * We require columns specified in foreignrel->reltarget->exprs and those
 	 * required for evaluating the local conditions.
 	 */
-#if (PG_VERSION_NUM < 90600)
-	tlist = add_to_flat_tlist(tlist, foreignrel->reltargetlist);
-	tlist = add_to_flat_tlist(tlist,
-							  pull_var_clause((Node *) fpinfo->local_conds,
-											  PVC_RECURSE_AGGREGATES,
-											  PVC_RECURSE_PLACEHOLDERS));
-#else
 	tlist = add_to_flat_tlist(tlist, foreignrel->reltarget->exprs);
 	tlist = add_to_flat_tlist(tlist,
 							  pull_var_clause((Node *) fpinfo->local_conds,
 											  PVC_RECURSE_PLACEHOLDERS));
-#endif /* PG_VERSION_NUM < 90600 */
 
 	return tlist;
 }

@@ -40,26 +40,15 @@
 #include "utils/rel.h"
 #include "storage/ipc.h"
 
-#if (PG_VERSION_NUM >= 90200)
 #include "optimizer/pathnode.h"
 #include "optimizer/restrictinfo.h"
 #include "optimizer/planmain.h"
-#endif
 
 #include "jni.h"
 
 #define Str(arg) #arg
 #define StrValue(arg) Str(arg)
 #define STR_PKGLIBDIR StrValue(PKG_LIB_DIR)
-
-#if PG_VERSION_NUM >= 90500
-#define HADOOP_FDW_IMPORT_API
-#define HADOOP_FDW_JOIN_API
-#else
-#undef HADOOP_FDW_IMPORT_API
-#undef HADOOP_FDW_JOIN_API
-#endif  /* PG_VERSION_NUM >= 90500 */
-
 
 PG_MODULE_MAGIC;
 
@@ -77,6 +66,7 @@ struct hadoopFdwOption
 	const char *optname;
 	Oid			optcontext;		/* Oid of catalog in which option may appear */
 };
+
 
 /*
  * Valid options for hadoop_fdw.
@@ -103,10 +93,10 @@ static struct hadoopFdwOption valid_options[] =
 	{NULL, InvalidOid}
 };
 
+
 /*
  * FDW-specific information for ForeignScanState.fdw_state.
  */
-
 typedef struct hadoopFdwExecutionState
 {
 	char	   *query;
@@ -115,6 +105,7 @@ typedef struct hadoopFdwExecutionState
 	jobject		java_call;
 	List	   *retrieved_attrs;	/* list of retrieved attribute numbers */
 } hadoopFdwExecutionState;
+
 
 /*
  * SQL functions
@@ -125,14 +116,11 @@ extern Datum hadoop_fdw_validator(PG_FUNCTION_ARGS);
 PG_FUNCTION_INFO_V1(hadoop_fdw_handler);
 PG_FUNCTION_INFO_V1(hadoop_fdw_validator);
 
+
 /*
  * FDW callback routines
  */
-#if (PG_VERSION_NUM < 90200)
-static FdwPlan *hadoopPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel);
-#endif
 
-#if (PG_VERSION_NUM >= 90200)
 static void hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 static void hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 static ForeignScan *
@@ -142,28 +130,22 @@ hadoopGetForeignPlan(
 					 Oid foreigntableid,
 					 ForeignPath *best_path,
 					 List *tlist,
-					 List *scan_clauses
-#if PG_VERSION_NUM >= 90500
-					 , Plan *outer_plan
-#endif  /* PG_VERSION_NUM >= 90500 */
+					 List *scan_clauses,
+					 Plan *outer_plan
 );
-#endif
 
 static void hadoopExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static void hadoopBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *hadoopIterateForeignScan(ForeignScanState *node);
 static void hadoopReScanForeignScan(ForeignScanState *node);
 static void hadoopEndForeignScan(ForeignScanState *node);
-#ifdef HADOOP_FDW_IMPORT_API
 static List *hadoopImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serverOid);
-#endif  /* HADOOP_FDW_IMPORT_API */
 static hadoopFdwExecutionState *hadoopGetConnection(
 				char *svr_username,
 				char *svr_password,
 				char *svr_host,
 				int svr_port,
 				char *svr_schema);
-#ifdef HADOOP_FDW_JOIN_API
 static bool foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 				JoinType jointype, RelOptInfo *outerrel, RelOptInfo *innerrel,
 				JoinPathExtraData *extra);
@@ -173,7 +155,6 @@ static void hadoopGetForeignJoinPaths(PlannerInfo *root,
 							RelOptInfo *innerrel,
 							JoinType jointype,
 							JoinPathExtraData *extra);
-#endif /* HADOOP_FDW_JOIN_API */
 
 /*
  * Helper functions
@@ -425,28 +406,17 @@ hadoop_fdw_handler(PG_FUNCTION_ARGS)
 {
 	FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
-#if (PG_VERSION_NUM < 90200)
-	fdwroutine->PlanForeignScan = hadoopPlanForeignScan;
-#endif
-
-#if (PG_VERSION_NUM >= 90200)
 	fdwroutine->GetForeignRelSize = hadoopGetForeignRelSize;
 	fdwroutine->GetForeignPaths = hadoopGetForeignPaths;
 	fdwroutine->GetForeignPlan = hadoopGetForeignPlan;
-#endif
-
 	fdwroutine->ExplainForeignScan = hadoopExplainForeignScan;
 	fdwroutine->BeginForeignScan = hadoopBeginForeignScan;
 	fdwroutine->IterateForeignScan = hadoopIterateForeignScan;
 	fdwroutine->ReScanForeignScan = hadoopReScanForeignScan;
 	fdwroutine->EndForeignScan = hadoopEndForeignScan;
-#ifdef HADOOP_FDW_IMPORT_API
 	fdwroutine->ImportForeignSchema = hadoopImportForeignSchema;
-#endif  /* HADOOP_FDW_IMPORT_API */
-#ifdef HADOOP_FDW_JOIN_API
 	/* Support functions for join push-down */
 	fdwroutine->GetForeignJoinPaths = hadoopGetForeignJoinPaths;
-#endif  /* HADOOP_FDW_JOIN_API */
 	pqsignal(SIGINT, SIGINTInterruptHandler);
 
 	PG_RETURN_POINTER(fdwroutine);
@@ -773,68 +743,7 @@ hadoopGetServerOptions(Oid serveroid, int *querytimeout, int *maxheapsize, char 
 		}
 	}
 }
-#if (PG_VERSION_NUM < 90200)
-/*
- * hadoopPlanForeignScan
- *		Create a FdwPlan for a scan on the foreign table
- */
-static FdwPlan *
-hadoopPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
-{
-	FdwPlan    *fdwplan = NULL;
-	char	   *svr_drivername = NULL;
-	char	   *svr_username = NULL;
-	char	   *svr_password = NULL;
-	char	   *svr_query = NULL;
-	char	   *svr_table = NULL;
-	char	   *svr_url = NULL;
-	char	   *svr_jarfile = NULL;
-	char	   *svr_schema = NULL;
-	int			svr_querytimeout = 0;
-	int			svr_maxheapsize = 0;
-	char	   *query;
-	char	   *svr_host = NULL;
-	int			svr_port = 0;
-	ForeignTable *f_table = NULL;
 
-	SIGINTInterruptCheckProcess();
-
-	f_table = GetForeignTable(foreigntableid);
-	JVMInitialization(f_table->serverid);
-
-	fdwplan = makeNode(FdwPlan);
-
-	/* Fetch options */
-	hadoopGetServerOptions(
-						   f_table->serverid,
-						   &svr_querytimeout,
-						   &svr_maxheapsize,
-						   &svr_username,
-						   &svr_password,
-						   &svr_query,
-						   &svr_host,
-						   &svr_port
-		);
-	hadoopGetTableOptions(foreigntableid, &svr_table, &svr_schema);
-	/* Build the query */
-	if (svr_query)
-	{
-		size_t		len = strlen(svr_query) + 9;
-
-		query = (char *) palloc(len);
-		snprintf(query, len, "EXPLAIN %s", svr_query);
-	}
-	else
-	{
-		size_t		len = strlen(svr_table) + 23;
-
-		query = (char *) palloc(len);
-		snprintf(query, len, "EXPLAIN SELECT * FROM %s", svr_table);
-	}
-
-	return (fdwplan);
-}
-#endif
 
 /*
  * hadoopExplainForeignScan
@@ -900,12 +809,8 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 	Oid serverid;
-#ifndef HADOOP_FDW_JOIN_API
-	ForeignTable *f_table = NULL;
-#endif /* HADOOP_FDW_JOIN_API */
 	SIGINTInterruptCheckProcess();
 
-#ifdef HADOOP_FDW_JOIN_API
 	serverid = intVal(list_nth(fsplan->fdw_private, 2));
 	if (fsplan->scan.scanrelid > 0)
 	{
@@ -918,11 +823,6 @@ hadoopBeginForeignScan(ForeignScanState *node, int eflags)
 	}
 	else
 		foreigntableid = intVal(list_nth(fsplan->fdw_private, 3));
-#else
-	foreigntableid = RelationGetRelid(node->ss.ss_currentRelation);
-	f_table = GetForeignTable(foreigntableid);
-	serverid = f_table->serverid;
-#endif /* HADOOP_FDW_JOIN_API */
 	hadoopGetTableOptions(foreigntableid, &svr_table, &svr_schema);
 	hadoopGetServerOptions(serverid,
 						   &svr_querytimeout,
@@ -1126,7 +1026,6 @@ hadoopReScanForeignScan(ForeignScanState *node)
 	SIGINTInterruptCheckProcess();
 }
 
-#if (PG_VERSION_NUM >= 90200)
 /*
  * hadoopGetForeignPaths
  *		(9.2+) Get the foreign paths
@@ -1143,13 +1042,7 @@ hadoopGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 		 ": get foreign paths for relation ID %d", foreigntableid);
 
 	/* Create a ForeignPath node and add it as only possible path */
-#if PG_VERSION_NUM < 90500
-	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NIL));
-#elif PG_VERSION_NUM < 90600
-	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
-#else
 	add_path(baserel, (Path *) create_foreignscan_path(root, baserel, NULL, baserel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
-#endif /* PG_VERSION_NUM < 90500 */
 }
 
 /*
@@ -1162,10 +1055,8 @@ hadoopGetForeignPlan(PlannerInfo *root,
 					 Oid foreigntableid,
 					 ForeignPath *best_path,
 					 List *tlist,
-					 List *scan_clauses
-#if PG_VERSION_NUM >= 90500
-					 ,Plan *outer_plan
-#endif   /* PG_VERSION_NUM >= 90500 */
+					 List *scan_clauses,
+					 Plan *outer_plan
 )
 {
 	/*
@@ -1189,9 +1080,6 @@ hadoopGetForeignPlan(PlannerInfo *root,
 	List	   *fdw_scan_tlist = NIL;
 
 	Index		scan_relid = baserel->relid;
-#ifndef HADOOP_FDW_JOIN_API
-	ForeignTable *f_table;
-#endif /* HADOOP_FDW_JOIN_API */
 	hadoopFdwRelationInfo *fpinfo = (hadoopFdwRelationInfo *) baserel->fdw_private;
 
 	elog(DEBUG3, HADOOP_FDW_NAME
@@ -1218,13 +1106,7 @@ hadoopGetForeignPlan(PlannerInfo *root,
 		Assert(!scan_clauses);
 	}
 
-#ifdef HADOOP_FDW_JOIN_API
 	JVMInitialization(baserel->serverid);
-#else
-	Assert(foreigntableid);
-	f_table = GetForeignTable(foreigntableid);
-	JVMInitialization(f_table->serverid);
-#endif /* HADOOP_FDW_JOIN_API */
 	foreach(lc, scan_clauses)
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
@@ -1276,7 +1158,6 @@ hadoopGetForeignPlan(PlannerInfo *root,
 
 	elog(DEBUG1, HADOOP_FDW_NAME ": built HiveQL:\n\n%s\n", sql.data);
 
-#ifdef HADOOP_FDW_JOIN_API
 	/*
 	 * When it is a join relation the foreigntableid passed to hadoopGetForeignPlan
 	 * is zero. We cannot obtain the serverid from this relation so we add the serverid
@@ -1291,16 +1172,8 @@ hadoopGetForeignPlan(PlannerInfo *root,
 							 retrieved_attrs,
 							 makeInteger(baserel->serverid),
 							 makeInteger(fpinfo->foreigntableid));
-#else
-	fdw_private = list_make2(makeString(sql.data),
-							 retrieved_attrs);
-#endif /* HADOOP_FDW_JOIN_API */
 	/* Create the ForeignScan node */
-#if PG_VERSION_NUM >= 90500
 	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private, fdw_scan_tlist, NIL, (Plan *) NIL);
-#else
-	return make_foreignscan(tlist, local_exprs, scan_relid, params_list, fdw_private);
-#endif
 }
 
 /*
@@ -1351,13 +1224,8 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	 */
 	fpinfo->attrs_used = NULL;
 
-#if (PG_VERSION_NUM < 90600)
-	pull_varattnos((Node *) baserel->reltargetlist, baserel->relid,
-				   &fpinfo->attrs_used);
-#else
 	pull_varattnos((Node *) baserel->reltarget->exprs, baserel->relid,
 				   &fpinfo->attrs_used);
-#endif /* PG_VERSION_NUM < 90600 */
 	foreach(lc, fpinfo->local_conds)
 	{
 		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
@@ -1367,9 +1235,7 @@ hadoopGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	}
 
 }
-#endif
 
-#ifdef HADOOP_FDW_IMPORT_API
 /*
  ** hadoopImportForeignSchema
  ** Generates CREATE FOREIGN TABLE statements for each of the tables
@@ -1502,7 +1368,6 @@ hadoopImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 	(*env)->PopLocalFrame(env, NULL);
 	return result;
 }
-#endif  /* HADOOP_FDW_IMPORT_API */
 
 /*
  * hadoopGetConnection
@@ -1538,6 +1403,7 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	cp_len = strlen(var_CP) + 2;
 	jar_classpath = (char *) palloc(cp_len);
 	snprintf(jar_classpath, (cp_len + 1), "%s", var_CP);
+	elog(DEBUG3, HADOOP_FDW_NAME ": classpath for the dependency jars is %s", jar_classpath);
 
 	portstr = (char *) palloc(sizeof(int));
 	snprintf(portstr, sizeof(int), "%d", svr_port);
@@ -1554,6 +1420,9 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 		svr_url = (char *) palloc(cp_len);
 		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/default", svr_host, svr_port);
 	}
+
+	elog(DEBUG3, HADOOP_FDW_NAME ": connection url is %s", svr_url);
+
 
 	/* Stash away the state info we have already */
 	festate = (hadoopFdwExecutionState *) palloc(sizeof(hadoopFdwExecutionState));
@@ -1626,7 +1495,6 @@ hadoopGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	return festate;
 }
 
-#ifdef HADOOP_FDW_JOIN_API
 /*
  * hadoopGetForeignJoinPaths
  *		Add possible ForeignPath to joinrel, if join is safe to push down.
@@ -1686,15 +1554,10 @@ hadoopGetForeignJoinPaths(PlannerInfo *root,
 	 * Create a new join path and add it to the joinrel which represents a
 	 * join between foreign tables.
 	 */
-#if PG_VERSION_NUM < 90500
-	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, joinrel->rows, startup_cost, total_cost, NIL, NULL, NIL));
-#elif PG_VERSION_NUM < 90600
-	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, joinrel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
-#else
 	add_path(joinrel, (Path *) create_foreignscan_path(root, joinrel, NULL, joinrel->rows, startup_cost, total_cost, NIL, NULL, NULL, NIL));
-#endif /* PG_VERSION_NUM < 90500 */
 
 }
+
 
 /*
  * Assess whether the join between inner and outer relations can be pushed down
@@ -1869,4 +1732,3 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 
 	return true;
 }
-#endif /* HADOOP_FDW_JOIN_API */
