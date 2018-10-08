@@ -279,8 +279,3 @@ postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
 Then start the PostgreSQL server from this shell to have the server pick
 up the variables we set up.
 
-## Key Features ##
-
-- [*IMPORT FOREIGN SCHEMA*](IMPORT_FOREIGN_SCHEMA.md)
-- [*JOIN PUSHDOWN*](JOIN_PUSHDOWN.md)
-
