@@ -1,178 +1,72 @@
-Options which are to be set
------
+HADOOP_FDW
+==========
 
-The following parameters can be set on a JDBC foreign server:
+Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 10.
 
-drivername:	The name of the JDBC driver e.g.(org.postgresql.Driver).
-		Note that drivername has to be specified for hadoop_fdw
-		to work i.e. it is compulsory.
+## Prepare
 
-url:	        The JDBC URL that shall be used to connect to the foreign database.
-	        Note that URL has to be specified for hadoop_fdw
-		to work i.e. it is compulsory.
+In addition to normal PostgreSQL FDW pre-reqs, the primary specific
+requirements for this FDW are a JDK (we test with JDK 8) and a set of
+Hive client JAR files for the Hadoop distribution you are connecting
+with.
 
-querytimeout:   The time after which a query shall automatically be terminated.
-		The option can be used for terminating hung queries.
+## Building from Source
 
-jarfile:	The path and name(e.g. folder1/folder2/abc.jar) of the JAR file
-		of the JDBC driver to be used of the foreign database.
+First, download the source code under the contrib subdirectory of the
+PostgreSQL source tree and then build and install the FDW as below:
 
-maxheapsize:    The value of the maximum heap size of the JVM being used in hadoop_fdw.
-		Please read the notes about maxheapsize option in the installation 
-		instructions carefully before setting a value for the option.
+1) Create a link to your JVM in the PostgreSQL lib folder
 
-The following parameter can be set on a JDBC foreign table:
+```
+cd PathToFile/lib # cd to the PostgreSQL lib folder
+ln -s PathToFile/libjvm.so libjvm.so
+```
 
-query:		An SQL query to define the data set on the JDBC server.
+2) Build the FDW source
 
-table:		The name of a table (quoted and qualified as required)
-		on the foreign database table.
+```
+cd hadoop_fdw
+USE_PGXS=1 make
+USE_PGXS=1 make install # with sudo if necessary
+```
 
-The following parameter can be set on a user mapping for a JDBC
-foreign server:
+## To execute the FDW
 
-username:	The username to use when connecting to foreign database.
-		Default <none>
+1) Set the environment variables PGHOME,HIVE_HOME,HADOOP_HOME & HADOOP_FDW_CLASSPATH before starting up PG.
+These environment variables are read at JVM initialization time.
 
-password:	The password to authenticate to the foreign database with.
-		Default: <none>
+    PGHOME = Path to the PostgreSQL installation. 
+    HIVECLIENT_JAR_HOME = The path containing the Hive JDBC client jar files required for the FDW to run successfully.
+    HADOOP_FDW_CLASSPATH = .:$(echo $HIVECLIENT_JAR_HOME/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar
 
+## Usage
 
-Installing
-----------
+The following parameters can be set on a Hive2 foreign server object:
 
-**Important**
-
-Please ensure that the URL you pass in the url option when creating the server 
-is correct and is according to the JDBC URL that is accepted by the foreign database.
-Any fault in the passed JDBC URL can cause hard-to-understand errors.Please recheck 
-and validate the JDBC URL before passing it in server options.
+  * **`host`**: the address or hostname of the Hive2 server, Examples: "localhost" "127.0.0.1" "server1.domain.com".
+  * **`port`**: the port number of the Hive2 server.
 
 
-************************************************************************************************************************************************
+The following parameters can be set on a Hadoop foreign table object:
 
-** Installation instructions for source installation of PostgreSQL
+  * **`schema_name`**: the name of the schema in which the table exists. Defaults to "default".
+  * **`table_name`**: the name of the Hive table to query.  Defaults to the foreign table name used in the relevant CREATE command.
 
-Documentation for installing PostgreSQL from source 
-can be found [here](http://www.postgresql.org/docs/current/static/installation.html).
+Here is an example:
 
-The steps to follow to install HADOOP_FDW on source installation of PostgreSQL are:
 
-1) Enter the /contrib directory in PostgreSQL folder.
+	-- load EXTENSION first time after install.
+	CREATE EXTENSION hadoop_fdw;
 
-    gitc@ubuntu:~$ cd Downloads/postgresql-9.2beta2/contrib
+        -- create server object
+	CREATE SERVER hadoop_serv FOREIGN DATA WRAPPER hadoop_fdw
+		OPTIONS(host 'localhost', port '10000');
 
-2) Get HADOOP_FDW source.
+	-- Create a user mapping for the server.
+	CREATE USER MAPPING FOR public SERVER hadoop_serv OPTIONS(username 'test', password 'test');
 
-    $ git clone git://github.com/atris/HADOOP_FDW.git
+	-- Create a foreign table on the server.
+	CREATE FOREIGN TABLE test (id int) SERVER hadoop_serv OPTIONS (schema 'exmaple',table 'oorder');
 
-3) Enter the HADOOP_FDW folder.
-
-    $ cd HADOOP_FDW
-
-4) Execute Make Clean
-
-    $ make Clean
-
-5) Execute Make Install 
-(You may have to change to root/installation privileges before executing 
-Make Install)
-
-**Important** : Before running Make Install,please execute the following command:
-
-    $ sudo ln -s /usr/lib/jvm/java-6-openjdk/jre/lib/amd64/server/libjvm.so /usr/lib/libjvm.so
-
-Please replace the path in the command with the path to libjvm.so(it should be 
-in Java JRE folder).
-
-For locating libjvm.so,you can use the following command:
-
-    $ locate libjvm.so
-
-Please give the path to libjvm.so in the 'server' folder if multiple libjvm.so 
-files are being shown.
-
-If the above command does not work,please execute the following command
-
-    $ sudo ln -s /usr/lib/jvm/java-8-openjdk/jre/lib/amd64/server/libjvm.so /usr/lib/libjvm.so
-
-After running one of the above commands,please execute the following command:
-
-    $ sudo make install
-    
-6) Ensure Make Install executes successfully without any warning or errors.
-
-7) Enter psql.
-
-    $ psql
-
-6) Set up hadoop_fdw extension.
-
-    CREATE EXTENSION hadoop_fdw;
-
-7) Create a server that uses hadoop_fdw.
-
-**Command to set up server that uses hadoop_fdw as the foreign data wrapper:**
- 
-     CREATE SERVER jdbc_serv4 FOREIGN DATA WRAPPER hadoop_fdw OPTIONS(
-drivername 'org.sqlite.JDBC',
-url 'jdbc:sqlite:/home/atri/atri1.sdb',
-querytimeout '15',
-jarfile '/home/atri/Downloads/sqlite-jdbc-3.7.2.jar',
-maxheapsize '600'
-);
-
-** Explanation of setting up options for the server
-
-drivername : The drivername has to be given the value of the exact class name 
-which has to be loaded for the JDBC driver e.g. org.postgresql.Driver
-
-url : The url has to be given the value of the JDBC URL of the database from 
-which the data has to fetched by hadoop_fdw into PostgreSQL.
-
-jarfile : The jarfile has to be given the value of the path and name of the JAR 
-file of the JDBC driver of the database from which the data has to fetched.
-
-querytimeout : The time after which a query will be terminated automatically.
-This can be used for terminating hung queries.
-
-maxheapsize : The value of the option shall be set to the maximum heap size of 
-the JVM which is being used in jdbc fdw.It can be set from 1 Mb onwards.
-This option is used for setting the maximum heap size of the JVM manually.
-
-**Important** : Please note that setting the maximum heap size of the JVM 
-manually can lead to decrease in performance of hadoop_fdw.It is recommended that
-you double check the value you are setting in maxheapsize.It is not a 
-compulsory option i.e. If you do net set any value for maxheapsize,the default 
-value for the maximum heap size of the JVM being used in hadoop_fdw shall be used.
-Please use it only if you want to set the maximum heap size of the JVM manually.
-Setting it to a very low value can lead to drastic performance hit.
-Also,since the JVM being used in jdbc fdw is created only once for the entire 
-psql session,therefore,the first query issued that uses jdbc fdw shall set the
-value of maximum heap size of the JVM(if the first query specifies a maximum heap value).
-
-8) Create a user mapping for the server.
-
-    gitc=# CREATE USER MAPPING FOR gitc SERVER jdbc_serv3 OPTIONS(username 'test',password 'test');
-
-9) Create a foreign table on the server.
-
-    gitc=# CREATE FOREIGN TABLE test16 (a int) SERVER jdbc_serv3 OPTIONS (query 'select generate_series(1,1000000)');
-
-10) Query the foreign table.
-
-    gitc=# SELECT * FROM test16;
-
-The output should be :
-
-    Connection to PostgreSQL 9.2beta2 successful.
-
-    a    
-    ---------
-       1
-       2
-       3
-       4
-       5
-    Time: 6080.603 ms
-    gitc=# 
+	-- Query the foreign table.
+	SELECT * FROM test limit 5;
