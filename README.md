@@ -8,6 +8,7 @@ Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within Postgre
 
 - [*IMPORT FOREIGN SCHEMA*](IMPORT_FOREIGN_SCHEMA.md)
 - [*JOIN PUSHDOWN*](JOIN_PUSHDOWN.md)
+- [*HORTONWORKS-HDP & CLOUDERA](HDP_CLOUDERA_INSTRUCTIONS.md)
 
 
 ## Prepare
