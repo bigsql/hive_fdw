@@ -3,6 +3,13 @@ HADOOP_FDW
 
 Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 10.
 
+
+## Key Features ##
+
+- [*IMPORT FOREIGN SCHEMA*](IMPORT_FOREIGN_SCHEMA.md)
+- [*JOIN PUSHDOWN*](JOIN_PUSHDOWN.md)
+
+
 ## Prepare
 
 In addition to normal PostgreSQL FDW pre-reqs, the primary specific
@@ -26,8 +33,8 @@ ln -s PathToFile/libjvm.so libjvm.so
 
 ```
 cd hadoop_fdw
-USE_PGXS=1 make
-USE_PGXS=1 make install # with sudo if necessary
+make
+make install
 ```
 
 ## To execute the FDW

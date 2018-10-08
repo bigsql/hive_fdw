@@ -3,18 +3,16 @@ Using HADOOP-FDW with a Hadoop Sandbox VM
 
 ## Overview ##
 
-This HadoopFDW extension is built into the Windows, OSX & Linux
-distributions of [PostgreSQL by BigSQL](http://bigsql.org).  It allows
-access to Hive tables from PostgreSQL.
+This HadoopFDW extension is built for the Linux distribution of [PostgreSQL by BigSQL]
+(http://bigsql.org).  It allows access to Hive from PostgreSQL.
 
 This document elucidates the steps needed to run it against *CDH 5.5
 Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 ## Pre-Requisites ##
 
-Our latest testing has been with CDH 5.5 and HDP 2.4 from Windows, OSX
-and Linux using Java 8.  For this document, we assume that you have
-downloaded and installed one of the following VMs:
+Our latest testing has been with CDH 5.5 and HDP 2.4 from Linux using Java 8.  
+For this document, we assume that you have downloaded and installed one of the following VMs:
 
 - *CDH 5.5 Quickstart VM*
   (from [Cloudera Quickstart Downloads](http://www.cloudera.com/downloads/quickstart_vms.html))
@@ -158,7 +156,7 @@ In a shell or Command Prompt, compile it with:
 javac HiveJdbcClient.java
 ```
 
-### Linux and OS X ###
+### Linux ###
 
 Assuming that you copied the Hive client JAR files to the directory
 `/opt/hadoop/hive-client-lib`, run the following command in your
@@ -166,24 +164,6 @@ shell to execute the program:
 
 ```sh
 java -cp .:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :) HiveJdbcClient
-```
-
-### Windows ###
-
-Assuming that you copied the Hive client JAR files to the directory
-`C:\hive-client-lib`, run the following command in the Command Prompt to
-execute the program.
-
-#### CDH ####
-
-```bat
-java -cp .;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar HiveJdbcClient
-```
-
-#### HDP ####
-
-```bat
-java -cp .;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar HiveJdbcClient
 ```
 
 ### Confirm Output ###
@@ -230,14 +210,12 @@ server:
     in the same directory as that of the PostgreSQL extension
     library files.
 
-We provide OS-specific examples for these variables below.
+We provide examples for these variables below.
 
-### Perform OS-Specific Setup ###
+### Perform Setup ###
 
 Please stop the PostgreSQL server if it is running and follow the steps
 for the platform matching that of your PostgreSQL server:
-
-### Linux ###
 
 We assume that `Hadoop_FDW.jar` resides under the PostgreSQL extension
 library directory `/usr/local/pgsql/lib` and that the Hive client JAR
@@ -257,74 +235,10 @@ example, we are using bash:
 export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/lib/Hadoop_FDW.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
 ```
 
-Then start the PostgreSQL server from this shell to have the server pick
-up the variables we set up.
-
-### Windows ###
-
-We assume that `Hadoop_FDW.jar` resides under the PostgreSQL extension
-library directory `C:\msys2-x64\usr\local\pgsql\lib` and that the Hive
-client JAR files were copied under the directory `C:\hive-client-lib`.
-
-Add your JDK's `bin` and `jre\bin\server` directories to the PATH
-environment variable.  Assuming the Java install location of
-`C:\java-platform\jdk\jdk1.8.0_77` and that you are using the Command
-Prompt to set up the environment variables for the PostgreSQL server,
-run these commands:
-
-```bat
-set JAVA_HOME=C:\java-platform\jdk\jdk1.8.0_77
-set PATH=%JAVA_HOME%\bin;%JAVA_HOME%\jre\bin\server;%PATH%
-```
-
-Next, in the Command Prompt, set up the requisite environment variables.
-
-#### CDH ####
-
-```bat
-set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\lib\Hadoop_FDW.jar;C:\hive-client-lib\hadoop-common-2.6.0-cdh5.5.0.jar;C:\hive-client-lib\hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
-```
-
-#### HDP ####
-
-```bat
-set HADOOP_FDW_CLASSPATH=C:\msys2-x64\usr\local\pgsql\lib\Hadoop_FDW.jar;C:\hive-client-lib\hadoop-common-2.7.1.2.4.0.0-169.jar;C:\hive-client-lib\hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
-```
-
-Then start the PostgreSQL server from this Command Prompt to have the
-server pick up the variables we set up.
-
-### OS X ###
-
-**NB: If you have an OS X machine where the default system Java is *not*
-installed, please install the legacy Java 6 runtime from
-[Apple](https://support.apple.com/kb/DL1572?locale=en_US) before
-continuing otherwise the FDW will crash the PostgreSQL server because of
-[this](https://bugs.openjdk.java.net/browse/JDK-7131356) open issue with
-the Oracle JDK.**
-
-We assume that `Hadoop_FDW.jar` resides under the PostgreSQL extension
-library directory `/usr/local/pgsql/lib` and that the Hive client JAR
-files were copied under the directory `/opt/hadoop/hive-client-lib`.
-
-Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
-run in a shell:
-
-```sh
-sudo ln -s /opt/jdk/x64/jdk1.8.0_40/jre/lib/amd64/server/libjvm.dylib /usr/local/pgsql/lib/libjvm.dylib
-```
-
-Also, in the shell, set up the requisite environment variables.  In this
-example, we are using bash:
-
-```bash
-export HADOOP_FDW_CLASSPATH=/usr/local/pgsql/lib/Hadoop_FDW.jar:$(echo /opt/hadoop/hive-client-lib/*.jar | tr ' ' :)
-```
-
-Then start the PostgreSQL server from this shell to have the server pick
-up the variables we set up.
-
-## Use with Sample TABLE ##
+-Then start the PostgreSQL server from this shell to have the server pick
+-up the variables we set up.
+-
+-## Use with Sample TABLE ##
 
 The sample TABLE `sample_07` ships as part of the HDP Sandbox VM.  If
 you are using CDH, we assume you have created a similar TABLE.  Below,
@@ -360,6 +274,10 @@ postgres=# SELECT code, total_emp FROM sample_07 ORDER BY code LIMIT 3;
  11-1011 |    299160
 (3 rows)
 ```
+```
+
+Then start the PostgreSQL server from this shell to have the server pick
+up the variables we set up.
 
 ## Key Features ##
 

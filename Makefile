@@ -21,10 +21,6 @@ SHLIB_LINK = -ljvm
 
 UNAME = $(shell uname)
 
-ifeq ($(UNAME), Darwin)
-	SHLIB_LINK = -I/System/Library/Frameworks/JavaVM.framework/Headers -L/System/Library/Frameworks/JavaVM.framework/Libraries -ljvm -framework JavaVM
-endif
-
 TRGTS = JAVAFILES
 
 JAVA_SOURCES = \
@@ -40,15 +36,7 @@ all:$(TRGTS)
 JAVAFILES:
 	javac $(JFLAGS) $(JAVA_SOURCES)
  
-ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
-else
-subdir = contrib/hadoop_fdw
-top_builddir = ../..
-include $(top_builddir)/src/Makefile.global
-include $(top_srcdir)/contrib/contrib-global.mk
-endif
-
 
