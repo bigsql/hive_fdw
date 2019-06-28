@@ -1,7 +1,7 @@
-HADOOP_FDW
+ATHENA_FDW
 ==========
 
-Foreign Data Wrapper (FDW) that facilitates access to Hadoop from within PostgreSQL 10.
+Foreign Data Wrapper (FDW) that facilitates access to Hive & Amazon Athena from within PostgreSQL.
 
 
 ## Key Features ##
@@ -35,7 +35,7 @@ ln -s PathToFile/libjvm.so libjvm.so
 2) Build the FDW source
 
 ```
-cd hadoop_fdw
+cd athena_fdw
 make
 make install
 ```
@@ -47,7 +47,7 @@ These environment variables are read at JVM initialization time.
 
     PGHOME = Path to the PostgreSQL installation. 
     HIVECLIENT_JAR_HOME = The path containing the Hive JDBC client jar files required for the FDW to run successfully.
-    HADOOP_FDW_CLASSPATH = .:$(echo $HIVECLIENT_JAR_HOME/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar
+    ATHENA_FDW_CLASSPATH = .:$(echo $HIVECLIENT_JAR_HOME/*.jar |  tr ' ' :):/PathToFile/hadoop-core-1.2.1.jar
 
 ## Usage
 
@@ -66,17 +66,17 @@ Here is an example:
 
 
 	-- load EXTENSION first time after install.
-	CREATE EXTENSION hadoop_fdw;
+	CREATE EXTENSION athena_fdw;
 
         -- create server object
-	CREATE SERVER hadoop_serv FOREIGN DATA WRAPPER hadoop_fdw
+	CREATE SERVER athena_serv FOREIGN DATA WRAPPER athena_fdw
 		OPTIONS(host 'localhost', port '10000');
 
 	-- Create a user mapping for the server.
-	CREATE USER MAPPING FOR public SERVER hadoop_serv OPTIONS(username 'test', password 'test');
+	CREATE USER MAPPING FOR public SERVER athena_serv OPTIONS(username 'test', password 'test');
 
 	-- Create a foreign table on the server.
-	CREATE FOREIGN TABLE test (id int) SERVER hadoop_serv OPTIONS (schema 'exmaple',table 'oorder');
+	CREATE FOREIGN TABLE test (id int) SERVER athena_serv OPTIONS (schema 'exmaple',table 'oorder');
 
 	-- Query the foreign table.
 	SELECT * FROM test limit 5;
