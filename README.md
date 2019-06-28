@@ -25,11 +25,11 @@ with.
 First, download the source code under the contrib subdirectory of the
 PostgreSQL source tree and then build and install the FDW as below:
 
-1) Create a link to your JVM in the PostgreSQL lib folder
+1) Create a link to your JVM in the PostgreSQL lib folder with commands something like
 
 ```
-cd PathToFile/lib # cd to the PostgreSQL lib folder
-ln -s PathToFile/libjvm.so libjvm.so
+cd ~/pg/10.9/lib
+ln -s /etc/alternatives/jre_1.8.0/lib/amd64/server/libjvm.so libjvm.so
 ```
 
 2) Build the FDW source
