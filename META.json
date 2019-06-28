@@ -1,45 +1,45 @@
 {
-   "name": "jdbc_fdw",
-   "abstract": "jdbc FDW for PostgreSQL 9.1+",
-   "description": "This extension implements a Foreign Data Wrapper for jdbc. It is supported on PostgreSQL 9.1 and above.",
-   "version": "1.0.0",
+   "name": "athena_fdw",
+   "abstract": "ATHENA FDW for PostgreSQL 10+",
+   "description": "This extension implements a Foreign Data Wrapper for Hive & Athena.",
+   "version": "3.0.0",
    "maintainer": [
-      "Atri Sharma <atri.jiit@gmail.com>"
+      "Denis Lussier <denisl@oscg-parters.com>"
    ],
    "license": "postgresql",
    "provides": {
-      "jdbc_fdw": {
-         "abstract": "jdbc FDW for PostgreSQL 9.1+",
-         "file": "jdbc_fdw--1.0.sql",
+      "athena_fdw": {
+         "abstract": "ATHENA FDW for PostgreSQL 10+",
+         "file": "athena_fdw--3.0.sql",
          "docfile": "README",
-         "version": "1.0.0"
+         "version": "3.0"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "9.1.0"
+            "PostgreSQL": "10" 
          }
       }
    },
    "resources": {
-      "bugtracker": {jdbc
-         "web": "https://github.com/atris/JDBC_FDW/issues"
+      "bugtracker": {athena
+         "web": "https://github.com/pgcentral/athena_fdw/issues"
       },
       "repository": {
-        "url":  "https://github.com/atris/JDBC_FDW.git",
-        "web":  "https://github.com/atris/JDBC_FDW",
+        "url":  "https://github.com/pgcentral/athena_fdw.git",
+        "web":  "https://github.com/pgcentral/athena_fdw",
         "type": "git"
       }
    },
-   "generated_by": "Atri Sharma",
+   "generated_by": "Denis Lussier",
    "meta-spec": {
-      "version": "1.0.0",
+      "version": "3.0.0",
       "url": "http://pgxn.org/meta/spec.txt"
    },
    "tags": [
       "fdw",
-      "jdbc",
+      "athena",
       "foreign data wrapper"
    ]
 }
