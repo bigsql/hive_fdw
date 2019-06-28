@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HADOOP 
+ *		  foreign-data wrapper for ATHENA
  *
  * IDENTIFICATION
- *		  hadoop_fdw/HadoopJDBCLoader.java
+ *		  athena_fdw/AthenaJDBCLoader.java
  *
  *-------------------------------------------------------------------------
  */
@@ -13,15 +13,15 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.MalformedURLException;
  
-public class HadoopJDBCLoader extends URLClassLoader
+public class AthenaJDBCLoader extends URLClassLoader
 {
 
 /*
- * HadoopJDBCLoader
- *		Constructor of HadoopJDBCLoader class.
+ * AthenaJDBCLoader
+ *		Constructor of AthenaJDBCLoader class.
  */
 	public 
-	HadoopJDBCLoader(URL[] path)
+	AthenaJDBCLoader(URL[] path)
 	{
 		super(path);
 	}

@@ -11,14 +11,14 @@
  * Copyright (c) 2012-2018, BigSQL
  *
  * IDENTIFICATION
- *                hadoop_fdw/src/hive_funcs.c
+ *                athena_fdw/src/hive_funcs.c
  *
  *-------------------------------------------------------------------------
  */
 
 #include "postgres.h"
 
-#include "hadoop_fdw.h"
+#include "athena_fdw.h"
 
 #include "access/htup_details.h"
 #include "catalog/pg_proc.h"

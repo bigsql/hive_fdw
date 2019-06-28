@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for HADOOP
+ *		  foreign-data wrapper for ATHENA
  *
  * IDENTIFICATION
- *		  hadoop_fdw/HadoopJDBCUtils.java
+ *		  athena_fdw/AthenaJDBCUtils.java
  *
  *-------------------------------------------------------------------------
  */
@@ -17,7 +17,7 @@ import java.net.MalformedURLException;
 import java.util.*;
 
 
-public class HadoopJDBCUtils
+public class AthenaJDBCUtils
 {
 	private ResultSet result_set;
 	private ResultSet result_set1;
@@ -26,7 +26,7 @@ public class HadoopJDBCUtils
 	private int NumberOfRows;
 	private Statement sql;
 	private		String[] Iterate;
-	private static HadoopJDBCLoader Hadoop_Driver_Loader;
+	private static AthenaJDBCLoader Athena_Driver_Loader;
 	private StringWriter exception_stack_trace_string_writer;
 	private PrintWriter exception_stack_trace_print_writer;
 	private		ArrayList < String > mylist;
@@ -42,9 +42,9 @@ public class HadoopJDBCUtils
 	{
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
-		Properties		HadoopProperties;
-		Class			HadoopDriverClass = null;
-		Driver				HadoopDriver = null;
+		Properties		AthenaProperties;
+		Class			AthenaDriverClass = null;
+		Driver				AthenaDriver = null;
 		String				DriverClassName = options_array[0];
 		String				url = options_array[1];
 		String				userName = options_array[2];
@@ -61,25 +61,25 @@ public class HadoopJDBCUtils
 			File	JarFile = new File(options_array[4]);
 			String		jarfile_path = JarFile.toURI().toURL().toString();
 
-			if (Hadoop_Driver_Loader == null)
+			if (Athena_Driver_Loader == null)
 			{
-				/* If Hadoop_Driver_Loader is being created. */
-				Hadoop_Driver_Loader = new HadoopJDBCLoader(new URL[]{JarFile.toURI().toURL()});
+				/* If Athena_Driver_Loader is being created. */
+				Athena_Driver_Loader = new AthenaJDBCLoader(new URL[]{JarFile.toURI().toURL()});
 			}
-			else if (Hadoop_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
+			else if (Athena_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
 			{
-				Hadoop_Driver_Loader.addPath(jarfile_path);
+				Athena_Driver_Loader.addPath(jarfile_path);
 			}
 
-			HadoopDriverClass = Hadoop_Driver_Loader.loadClass(DriverClassName);
+			AthenaDriverClass = Athena_Driver_Loader.loadClass(DriverClassName);
 
-			HadoopDriver = (Driver)HadoopDriverClass.newInstance();
-			HadoopProperties = new Properties();
+			AthenaDriver = (Driver)AthenaDriverClass.newInstance();
+			AthenaProperties = new Properties();
 
-			HadoopProperties.put("user", userName);
-			HadoopProperties.put("password", password);
+			AthenaProperties.put("user", userName);
+			AthenaProperties.put("password", password);
 
-			conn = HadoopDriver.connect(url, HadoopProperties);
+			conn = AthenaDriver.connect(url, AthenaProperties);
 
 		}
 		catch (Exception initialize_exception)
@@ -105,9 +105,9 @@ public class HadoopJDBCUtils
 	{
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
-		Properties		HadoopProperties;
-		Class			HadoopDriverClass = null;
-		Driver				HadoopDriver = null;
+		Properties		AthenaProperties;
+		Class			AthenaDriverClass = null;
+		Driver				AthenaDriver = null;
 
 		exception_stack_trace_string_writer = new StringWriter();
 		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
@@ -247,9 +247,9 @@ public class HadoopJDBCUtils
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
 		ResultSetMetaData	result_set_metadata1;
-		Properties		HadoopProperties;
-		Class			HadoopDriverClass = null;
-		Driver			HadoopDriver = null;
+		Properties		AthenaProperties;
+		Class			AthenaDriverClass = null;
+		Driver			AthenaDriver = null;
 		String[]		column_name;
 		String[]		column_type;
 		int[]			column_size;

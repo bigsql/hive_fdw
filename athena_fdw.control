@@ -1,0 +1,13 @@
+##########################################################################
+#
+#                foreign-data wrapper for ATHENA 
+#
+# IDENTIFICATION
+#                 athena_fdw/athena_fdw.control
+# 
+##########################################################################
+
+comment = 'Foreign data wrapper for querying ATHENA'
+default_version = '3.0'
+module_pathname = '$libdir/athena_fdw'
+relocatable = true

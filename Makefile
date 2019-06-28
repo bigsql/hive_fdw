@@ -1,21 +1,21 @@
 ##########################################################################
 #
-#                foreign-data wrapper for HADOOP 
+#                foreign-data wrapper for ATHENA 
 #
 # IDENTIFICATION
-#                 hadoop_fdw/Makefile
+#                 athena_fdw/Makefile
 # 
 ##########################################################################
 
-MODULE_big = hadoop_fdw
-OBJS = hadoop_fdw.o deparse.o hive_funcs.o
+MODULE_big = athena_fdw
+OBJS = athena_fdw.o deparse.o hive_funcs.o
 
-EXTENSION = hadoop_fdw
-DATA = hadoop_fdw--2.6.sql
+EXTENSION = athena_fdw
+DATA = athena_fdw--2.6.sql
 
-REGRESS = hadoop_fdw
+REGRESS = athena_fdw
 
-HADOOP_CONFIG = hadoop_config
+ATHENA_CONFIG = athena_config
 
 SHLIB_LINK = -ljvm
 
@@ -24,8 +24,8 @@ UNAME = $(shell uname)
 TRGTS = JAVAFILES
 
 JAVA_SOURCES = \
-        HadoopJDBCUtils.java \
-	HadoopJDBCLoader.java \
+        AthenaJDBCUtils.java \
+	AthenaJDBCLoader.java \
  
 PG_CPPFLAGS=-D'PKG_LIB_DIR=$(pkglibdir)'
 

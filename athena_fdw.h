@@ -1,18 +1,18 @@
 /*-------------------------------------------------------------------------
  *
- * hadoop_fdw.h
- *                Foreign-data wrapper for Hadoop
+ * athena_fdw.h
+ *                Foreign-data wrapper for ATHENA
  *
  * Copyright (c) 2012-2018, BigSQL
  * Portions Copyright (c) 2012-2013, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *                hadoop_fdw/src/hadoop_fdw.h
+ *                athena_fdw/src/athena_fdw.h
  *
  *-------------------------------------------------------------------------
  */
-#ifndef HADOOP_FDW_H
-#define HADOOP_FDW_H
+#ifndef ATHENA_FDW_H
+#define ATHENA_FDW_H
 
 #include "commands/defrem.h"
 #include "foreign/foreign.h"
@@ -21,9 +21,9 @@
 #include "optimizer/planmain.h"
 #include "utils/rel.h"
 
-#define HADOOP_FDW_NAME				"hadoop_fdw"
+#define ATHENA_FDW_NAME				"athena_fdw"
 
-typedef struct hadoopFdwRelationInfo
+typedef struct athenaFdwRelationInfo
 {
 	/*
 	 * True means that the relation can be pushed down. Always true for simple
@@ -48,7 +48,7 @@ typedef struct hadoopFdwRelationInfo
 	JoinType	jointype;
 	List	   *joinclauses;
 	Oid			foreigntableid;
-} hadoopFdwRelationInfo;
+} athenaFdwRelationInfo;
 
 extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 
@@ -60,5 +60,5 @@ extern List *build_tlist_to_deparse(RelOptInfo *foreign_rel);
 extern void
 deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
 						List *remote_conds, List **retrieved_attrs, List **params_list,
-						hadoopFdwRelationInfo *fpinfo, List *fdw_scan_tlist);
-#endif   /* HADOOP_FDW_H */
+						athenaFdwRelationInfo *fpinfo, List *fdw_scan_tlist);
+#endif   /* ATHENA_FDW_H */
