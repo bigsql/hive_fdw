@@ -30,6 +30,8 @@ PostgreSQL source tree and then build and install the FDW as below:
 ```
 cd ~/pg/10.9/lib
 ln -s /etc/alternatives/jre_1.8.0/lib/amd64/server/libjvm.so libjvm.so
+   or
+ln -s /usr/java/latest/jre/lib/amd64/server/libjvm.so libjvm.so
 ```
 
 2) Build the FDW source
