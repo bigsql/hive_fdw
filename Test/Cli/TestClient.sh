@@ -5,6 +5,6 @@ if [ $# -gt 10 ]; then
 	exit 0 
 fi
 
-java -cp .:$HADOOP_FDW_CLASSPATH  HiveJdbcClient "$@"
+java -cp .:$ATHENA_FDW_CLASSPATH  HiveJdbcClient "$@"
 
 exit 0

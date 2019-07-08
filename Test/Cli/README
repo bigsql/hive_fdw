@@ -1,14 +1,13 @@
-TestClient.sh is a test script to check the Hive JDBC drivers connectivity with Hadoop Sandbox VM
+TestClient.sh is a test script to check the Hive JDBC drivers connectivit
 
 General instructions to run this script:
 
 Linux and OS X
 Assuming that you copied the Hive client JAR files to the directory /opt/hadoop/hive-client-lib
 
-Windows
-Assuming that you copied the Hive client JAR files to the directory C:\hive-client-lib
-
-Before running this test script please set the environment variable HADOOP_FDW_CLASSPATH referencing all the Hive client JARfiles we identified previously.This shell script can be run from command prompt with the following available options
+Before running this test script please set the environment variable 
+ATHENA_FDW_CLASSPATH referencing all the Hive client JARfiles we identified previously.
+This shell script can be run from command prompt with the following available options
 
 General options:
 	
