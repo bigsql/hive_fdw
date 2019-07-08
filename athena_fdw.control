@@ -8,6 +8,6 @@
 ##########################################################################
 
 comment = 'Foreign data wrapper for querying ATHENA'
-default_version = '3.0'
+default_version = '3.1'
 module_pathname = '$libdir/athena_fdw'
 relocatable = true
