@@ -363,7 +363,11 @@ deparseTargetList(StringInfo buf,
 	first = true;
 	for (i = 1; i <= tupdesc->natts; i++)
 	{
+#if PG_VERSION_NUM < 110000
 		Form_pg_attribute attr = tupdesc->attrs[i - 1];
+#else
+		Form_pg_attribute attr = TupleDescAttr(tupdesc, i - 1);
+#endif
 
 		/* Ignore dropped attributes. */
 		if (attr->attisdropped)
@@ -1058,7 +1062,11 @@ deparseColumnRef(StringInfo buf, int varno, int varattno, PlannerInfo *root, boo
 	 * option, use attribute name.
 	 */
 	if (colname == NULL)
+#if PG_VERSION_NUM < 110000
 		colname = get_relid_attribute_name(rte->relid, varattno);
+#else
+		colname = get_attname(rte->relid, varattno, false);
+#endif
 
 		if (qualify_col)
 			ADD_REL_QUALIFIER(buf, varno);
