@@ -25,7 +25,11 @@
 #include "catalog/pg_foreign_table.h"
 #include "catalog/pg_user_mapping.h"
 #include "catalog/pg_type.h"
-#include "optimizer/var.h"
+#if PG_VERSION_NUM < 120000
+	#include "optimizer/var.h"
+#else
+	#include "optimizer/optimizer.h"
+#endif
 #include "utils/guc.h"
 #include "commands/defrem.h"
 #include "commands/explain.h"
@@ -944,8 +948,11 @@ athenaIterateForeignScan(ForeignScanState *node)
 			tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att), values);
 		else
 			tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_ScanTupleSlot->tts_tupleDescriptor), values);
-
+#if PG_VERSION_NUM < 120000
 		ExecStoreTuple(tuple, slot, InvalidBuffer, false);
+#else
+		ExecStoreHeapTuple(tuple, slot, false);
+#endif
 		++(festate->NumberOfRows);
 
 		for (j = 0; j < festate->NumberOfColumns; j++)

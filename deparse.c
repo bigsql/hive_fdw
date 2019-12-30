@@ -35,7 +35,11 @@
 #include "utils/syscache.h"
 #include "utils/array.h"
 #include "optimizer/tlist.h"
-#include "optimizer/var.h"
+#if PG_VERSION_NUM < 120000
+        #include "optimizer/var.h"
+#else
+        #include "optimizer/optimizer.h"
+#endif
 
 typedef struct foreign_glob_cxt
 {
