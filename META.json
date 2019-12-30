@@ -1,24 +1,24 @@
 {
    "name": "athena_fdw",
-   "abstract": "ATHENA FDW for PostgreSQL 10+",
+   "abstract": "ATHENA FDW for PostgreSQL 11+",
    "description": "This extension implements a Foreign Data Wrapper for Hive/Athena.",
-   "version": "3.1",
+   "version": "3.2",
    "maintainer": [
       "Denis Lussier <denisl@oscg-parters.com>"
    ],
    "license": "postgresql",
    "provides": {
       "athena_fdw": {
-         "abstract": "ATHENA FDW for PostgreSQL 10+",
-         "file": "athena_fdw--3.1.sql",
+         "abstract": "ATHENA FDW for PostgreSQL 11+",
+         "file": "athena_fdw--3.2.sql",
          "docfile": "README",
-         "version": "3.1"
+         "version": "3.2"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "10" 
+            "PostgreSQL": "11" 
          }
       }
    },
@@ -34,7 +34,7 @@
    },
    "generated_by": "Denis Lussier",
    "meta-spec": {
-      "version": "3.1",
+      "version": "3.2",
       "url": "http://pgxn.org/meta/spec.txt"
    },
    "tags": [

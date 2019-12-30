@@ -11,7 +11,7 @@ MODULE_big = athena_fdw
 OBJS = athena_fdw.o deparse.o hive_funcs.o
 
 EXTENSION = athena_fdw
-DATA = athena_fdw--3.1.sql
+DATA = athena_fdw--3.2.sql
 
 REGRESS = athena_fdw
 
