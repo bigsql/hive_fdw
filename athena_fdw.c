@@ -2,7 +2,7 @@
  *
  * PostgreSQL Foreign Data Wrapper for Athena
  *
- * Copyright (c) 2014-2019, BigSQL
+ * Copyright (c) 2014-2020, BigSQL
  * Portions Copyright (c) 2012-2015, PostgreSQL Global Development Group & Others
  *
  * IDENTIFICATION
@@ -940,10 +940,10 @@ athenaIterateForeignScan(ForeignScanState *node)
 			values[i] = ConvertStringToCString((jobject) (*env)->GetObjectArrayElement(env, java_rowarray, i));
 		}
 
-	if (fsplan->scan.scanrelid > 0)
-		tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att), values);
-	else
-		tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_ScanTupleSlot->tts_tupleDescriptor), values);
+		if (fsplan->scan.scanrelid > 0)
+			tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att), values);
+		else
+			tuple = BuildTupleFromCStrings(TupleDescGetAttInMetadata(node->ss.ss_ScanTupleSlot->tts_tupleDescriptor), values);
 
 		ExecStoreTuple(tuple, slot, InvalidBuffer, false);
 		++(festate->NumberOfRows);
