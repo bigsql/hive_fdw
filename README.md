@@ -1,4 +1,4 @@
-# HiveFDW
+# Hive_FDW
 
 Foreign Data Wrapper (FDW) that facilitates access to Hive Big Data Distributed Queries from within PostgreSQL.
 
