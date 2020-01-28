@@ -1,7 +1,6 @@
-ATHENA_FDW
-==========
+# HiveFDW
 
-Foreign Data Wrapper (FDW) that facilitates access to Hive & Amazon Athena from within PostgreSQL.
+Foreign Data Wrapper (FDW) that facilitates access to Hive Big Data Distributed Queries from within PostgreSQL.
 
 
 ## Key Features ##
