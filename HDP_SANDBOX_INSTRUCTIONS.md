@@ -1,23 +1,15 @@
-Using HIVE-FDW with a Hadoop Sandbox VM
-=========================================
+Using HIVE-FDW with HDP on Sandbox VM
+=====================================
 
 ## Overview ##
 
 This extension provides access to Big Data from PostgreSQL.
 
-This document outlines the steps needed to run it against *CDH 5.5
-Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 ## Pre-Requisites ##
 
-Our latest testing has been with CDH 5.5 and HDP 2.4 from Linux using Java 8.  
-For this document, we assume that you have downloaded and installed one of the following VMs:
-
-- *CDH 5.5 Quickstart VM*
-  (from [Cloudera Quickstart Downloads](http://www.cloudera.com/downloads/quickstart_vms.html))
-
 - *HDP 2.4 on Hortonworks Sandbox VM*
-  (from [Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox))
+  (from [Hortonworks Sandbox Downloads](https://www.cloudera.com/downloads/hortonworks-sandbox.html))
 
 We also assume that your Hadoop VM is accessible to the machine running
 PostgreSQL with the name **hive-vm** and that the host running
@@ -36,25 +28,6 @@ Connect to the VM using SSH from the PostgreSQL host:
 ```bash
 ssh root@hive-vm
 ```
-## JAR files for CDH ##
-
-Determine the specific versions of the JAR files by running the `ls`
-commands with the glob patterns shown below:
-
-```bash
-[hive@sandbox ~]$ ls /usr/lib/hive/hive-common*[0-9].jar
-/usr/lib/hive/hive-common-2.6.0-cdh5.5.0.jar
-[hive@sandbox ~]$ ls /usr/lib/hive/lib/hive*jdbc*[0-9]*standalone.jar
-/usr/lib/hive/lib/hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
-```
-
-Please note that the pattern `hive-common*[0-9].jar` precludes the
-file `hive-common*-test.jar` from appearing and that the second
-pattern precludes the symlink `hive-jdbc-standalone.jar` from appearing.
-
-Once you have the paths for the two JAR files, SCP them to a directory
-`hive-client-lib` on the PostgreSQL host that you are installing the
-HiveFDW on.
 
 ## JAR files for HDP ##
 
@@ -169,17 +142,6 @@ java -cp .:$(echo /opt/hive/hive-client-lib/*.jar | tr ' ' :) HiveJdbcClient
 
 No matter the platform you ran the program on, please confirm the output
 for the program as shown below:
-
-#### CDH ####
-
-The last two lines of the output should be:
-
-```
-Running: SHOW DATABASES
-default
-```
-
-#### HDP ####
 
 The last three lines of the output should be:
 
