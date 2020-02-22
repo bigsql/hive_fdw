@@ -8,17 +8,17 @@
  * cases we also need to translate the function name into something
  * which is understood and accepted by Hive
  *
- * Copyright (c) 2012-2018, BigSQL
+ * Copyright (c) 2012-2020, BigSQL
  *
  * IDENTIFICATION
- *                athena_fdw/src/hive_funcs.c
+ *                hive_fdw/src/hive_funcs.c
  *
  *-------------------------------------------------------------------------
  */
 
 #include "postgres.h"
 
-#include "athena_fdw.h"
+#include "hive_fdw.h"
 
 #include "access/htup_details.h"
 #include "catalog/pg_proc.h"

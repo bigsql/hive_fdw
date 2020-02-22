@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for ATHENA
+ *		  foreign-data wrapper for HIVE
  *
  * IDENTIFICATION
- *		  athena_fdw/AthenaJDBCUtils.java
+ *		  hive_fdw/HiveJDBCUtils.java
  *
  *-------------------------------------------------------------------------
  */
@@ -17,7 +17,7 @@ import java.net.MalformedURLException;
 import java.util.*;
 
 
-public class AthenaJDBCUtils
+public class HiveJDBCUtils
 {
 	private ResultSet result_set;
 	private ResultSet result_set1;
@@ -26,7 +26,7 @@ public class AthenaJDBCUtils
 	private int NumberOfRows;
 	private Statement sql;
 	private		String[] Iterate;
-	private static AthenaJDBCLoader Athena_Driver_Loader;
+	private static HiveJDBCLoader Hive_Driver_Loader;
 	private StringWriter exception_stack_trace_string_writer;
 	private PrintWriter exception_stack_trace_print_writer;
 	private		ArrayList < String > mylist;
@@ -42,9 +42,9 @@ public class AthenaJDBCUtils
 	{
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
-		Properties		AthenaProperties;
-		Class			AthenaDriverClass = null;
-		Driver				AthenaDriver = null;
+		Properties		HiveProperties;
+		Class			HiveDriverClass = null;
+		Driver				HiveDriver = null;
 		String				DriverClassName = options_array[0];
 		String				url = options_array[1];
 		String				userName = options_array[2];
@@ -61,25 +61,25 @@ public class AthenaJDBCUtils
 			File	JarFile = new File(options_array[4]);
 			String		jarfile_path = JarFile.toURI().toURL().toString();
 
-			if (Athena_Driver_Loader == null)
+			if (Hive_Driver_Loader == null)
 			{
-				/* If Athena_Driver_Loader is being created. */
-				Athena_Driver_Loader = new AthenaJDBCLoader(new URL[]{JarFile.toURI().toURL()});
+				/* If Hive_Driver_Loader is being created. */
+				Hive_Driver_Loader = new HiveJDBCLoader(new URL[]{JarFile.toURI().toURL()});
 			}
-			else if (Athena_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
+			else if (Hive_Driver_Loader.CheckIfClassIsLoaded(DriverClassName) == null)
 			{
-				Athena_Driver_Loader.addPath(jarfile_path);
+				Hive_Driver_Loader.addPath(jarfile_path);
 			}
 
-			AthenaDriverClass = Athena_Driver_Loader.loadClass(DriverClassName);
+			HiveDriverClass = Hive_Driver_Loader.loadClass(DriverClassName);
 
-			AthenaDriver = (Driver)AthenaDriverClass.newInstance();
-			AthenaProperties = new Properties();
+			HiveDriver = (Driver)HiveDriverClass.newInstance();
+			HiveProperties = new Properties();
 
-			AthenaProperties.put("user", userName);
-			AthenaProperties.put("password", password);
+			HiveProperties.put("user", userName);
+			HiveProperties.put("password", password);
 
-			conn = AthenaDriver.connect(url, AthenaProperties);
+			conn = HiveDriver.connect(url, HiveProperties);
 
 		}
 		catch (Exception initialize_exception)
@@ -105,9 +105,9 @@ public class AthenaJDBCUtils
 	{
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
-		Properties		AthenaProperties;
-		Class			AthenaDriverClass = null;
-		Driver				AthenaDriver = null;
+		Properties		HiveProperties;
+		Class			HiveDriverClass = null;
+		Driver				HiveDriver = null;
 
 		exception_stack_trace_string_writer = new StringWriter();
 		exception_stack_trace_print_writer = new PrintWriter(exception_stack_trace_string_writer);
@@ -247,9 +247,9 @@ public class AthenaJDBCUtils
 		DatabaseMetaData	db_metadata;
 		ResultSetMetaData	result_set_metadata;
 		ResultSetMetaData	result_set_metadata1;
-		Properties		AthenaProperties;
-		Class			AthenaDriverClass = null;
-		Driver			AthenaDriver = null;
+		Properties		HiveProperties;
+		Class			HiveDriverClass = null;
+		Driver			HiveDriver = null;
 		String[]		column_name;
 		String[]		column_type;
 		int[]			column_size;

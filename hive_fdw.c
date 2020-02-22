@@ -1,19 +1,19 @@
 /*-------------------------------------------------------------------------
  *
- * PostgreSQL Foreign Data Wrapper for Athena
+ * PostgreSQL Foreign Data Wrapper for Hive
  *
  * Copyright (c) 2014-2020, BigSQL
  * Portions Copyright (c) 2012-2015, PostgreSQL Global Development Group & Others
  *
  * IDENTIFICATION
- *		  athena_fdw/athena_fdw.c
+ *		  hive_fdw/hive_fdw.c
  *
  *-------------------------------------------------------------------------
  */
 
 #include "postgres.h"
 
-#include "athena_fdw.h"
+#include "hive_fdw.h"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -65,7 +65,7 @@ static bool InterruptFlag;		/* Used for checking for SIGINT interrupt */
 /*
  * Describes the valid options for objects that use this wrapper.
  */
-struct athenaFdwOption
+struct hiveFdwOption
 {
 	const char *optname;
 	Oid			optcontext;		/* Oid of catalog in which option may appear */
@@ -73,10 +73,10 @@ struct athenaFdwOption
 
 
 /*
- * Valid options for athena_fdw.
+ * Valid options for hive_fdw.
  *
  */
-static struct athenaFdwOption valid_options[] =
+static struct hiveFdwOption valid_options[] =
 {
 
 	/* Connection options */
@@ -101,34 +101,34 @@ static struct athenaFdwOption valid_options[] =
 /*
  * FDW-specific information for ForeignScanState.fdw_state.
  */
-typedef struct athenaFdwExecutionState
+typedef struct hiveFdwExecutionState
 {
 	char	   *query;
 	int			NumberOfRows;
 	int			NumberOfColumns;
 	jobject		java_call;
 	List	   *retrieved_attrs;	/* list of retrieved attribute numbers */
-} athenaFdwExecutionState;
+} hiveFdwExecutionState;
 
 
 /*
  * SQL functions
  */
-extern Datum athena_fdw_handler(PG_FUNCTION_ARGS);
-extern Datum athena_fdw_validator(PG_FUNCTION_ARGS);
+extern Datum hive_fdw_handler(PG_FUNCTION_ARGS);
+extern Datum hive_fdw_validator(PG_FUNCTION_ARGS);
 
-PG_FUNCTION_INFO_V1(athena_fdw_handler);
-PG_FUNCTION_INFO_V1(athena_fdw_validator);
+PG_FUNCTION_INFO_V1(hive_fdw_handler);
+PG_FUNCTION_INFO_V1(hive_fdw_validator);
 
 
 /*
  * FDW callback routines
  */
 
-static void athenaGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-static void athenaGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+static void hiveGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+static void hiveGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 static ForeignScan *
-athenaGetForeignPlan(
+hiveGetForeignPlan(
 					 PlannerInfo *root,
 					 RelOptInfo *baserel,
 					 Oid foreigntableid,
@@ -138,13 +138,13 @@ athenaGetForeignPlan(
 					 Plan *outer_plan
 );
 
-static void athenaExplainForeignScan(ForeignScanState *node, ExplainState *es);
-static void athenaBeginForeignScan(ForeignScanState *node, int eflags);
-static TupleTableSlot *athenaIterateForeignScan(ForeignScanState *node);
-static void athenaReScanForeignScan(ForeignScanState *node);
-static void athenaEndForeignScan(ForeignScanState *node);
-static List *athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serverOid);
-static athenaFdwExecutionState *athenaGetConnection(
+static void hiveExplainForeignScan(ForeignScanState *node, ExplainState *es);
+static void hiveBeginForeignScan(ForeignScanState *node, int eflags);
+static TupleTableSlot *hiveIterateForeignScan(ForeignScanState *node);
+static void hiveReScanForeignScan(ForeignScanState *node);
+static void hiveEndForeignScan(ForeignScanState *node);
+static List *hiveImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serverOid);
+static hiveFdwExecutionState *hiveGetConnection(
 				char *svr_username,
 				char *svr_password,
 				char *svr_host,
@@ -153,7 +153,7 @@ static athenaFdwExecutionState *athenaGetConnection(
 static bool foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel,
 				JoinType jointype, RelOptInfo *outerrel, RelOptInfo *innerrel,
 				JoinPathExtraData *extra);
-static void athenaGetForeignJoinPaths(PlannerInfo *root,
+static void hiveGetForeignJoinPaths(PlannerInfo *root,
 							RelOptInfo *joinrel,
 							RelOptInfo *outerrel,
 							RelOptInfo *innerrel,
@@ -163,9 +163,9 @@ static void athenaGetForeignJoinPaths(PlannerInfo *root,
 /*
  * Helper functions
  */
-static bool athenaIsValidOption(const char *option, Oid context);
+static bool hiveIsValidOption(const char *option, Oid context);
 static void
-athenaGetServerOptions(
+hiveGetServerOptions(
 					   Oid serveroid,
 					   int *querytimeout,
 					   int *maxheapsize,
@@ -175,7 +175,7 @@ athenaGetServerOptions(
 					   char **host,
 					   int *port);
 
-static void athenaGetTableOptions(
+static void hiveGetTableOptions(
 					  Oid foreigntableid,
 					  char **table,
 					  char **schema);
@@ -215,18 +215,18 @@ SIGINTInterruptCheckProcess()
 {
 	if (InterruptFlag == true)
 	{
-		jclass		AthenaJDBCUtilsClass;
+		jclass		HiveJDBCUtilsClass;
 		jmethodID	id_cancel;
 		jstring		cancel_result = NULL;
 		char	   *cancel_result_cstring = NULL;
 
-		AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-		if (AthenaJDBCUtilsClass == NULL)
+		HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+		if (HiveJDBCUtilsClass == NULL)
 		{
-			elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+			elog(ERROR, "HiveJDBCUtilsClass is NULL");
 		}
 
-		id_cancel = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "Cancel", "()Ljava/lang/String;");
+		id_cancel = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "Cancel", "()Ljava/lang/String;");
 		if (id_cancel == NULL)
 		{
 			elog(ERROR, "id_cancel is NULL");
@@ -291,7 +291,7 @@ DestroyJVM()
 /*
  * JVMInitialization
  *		Create the JVM which will be used for calling the Java routines
- *			that use ATHENA to connect and access the foreign database.
+ *			that use HIVE to connect and access the foreign database.
  *
  */
 static void
@@ -317,7 +317,7 @@ JVMInitialization(Oid serveroid)
 	char	   *var_CP = NULL;
 	int			cp_len = 0;
 
-	athenaGetServerOptions(
+	hiveGetServerOptions(
 						   serveroid,
 						   &svr_querytimeout,
 						   &svr_maxheapsize,
@@ -335,11 +335,11 @@ JVMInitialization(Oid serveroid)
 	if (FunctionCallCheck == false)
 	{
 
-		var_CP = getenv("ATHENA_FDW_CLASSPATH");
+		var_CP = getenv("HIVE_FDW_CLASSPATH");
 
 		if (!var_CP)
 		{
-			elog(ERROR, "Please set the environment variable ATHENA_FDW_CLASSPATH");
+			elog(ERROR, "Please set the environment variable HIVE_FDW_CLASSPATH");
 		}
 
 		cp_len = strlen(var_CP) + 25;
@@ -406,21 +406,21 @@ SIGINTInterruptHandler(int sig)
  * to my callback routines.
  */
 Datum
-athena_fdw_handler(PG_FUNCTION_ARGS)
+hive_fdw_handler(PG_FUNCTION_ARGS)
 {
 	FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
-	fdwroutine->GetForeignRelSize = athenaGetForeignRelSize;
-	fdwroutine->GetForeignPaths = athenaGetForeignPaths;
-	fdwroutine->GetForeignPlan = athenaGetForeignPlan;
-	fdwroutine->ExplainForeignScan = athenaExplainForeignScan;
-	fdwroutine->BeginForeignScan = athenaBeginForeignScan;
-	fdwroutine->IterateForeignScan = athenaIterateForeignScan;
-	fdwroutine->ReScanForeignScan = athenaReScanForeignScan;
-	fdwroutine->EndForeignScan = athenaEndForeignScan;
-	fdwroutine->ImportForeignSchema = athenaImportForeignSchema;
+	fdwroutine->GetForeignRelSize = hiveGetForeignRelSize;
+	fdwroutine->GetForeignPaths = hiveGetForeignPaths;
+	fdwroutine->GetForeignPlan = hiveGetForeignPlan;
+	fdwroutine->ExplainForeignScan = hiveExplainForeignScan;
+	fdwroutine->BeginForeignScan = hiveBeginForeignScan;
+	fdwroutine->IterateForeignScan = hiveIterateForeignScan;
+	fdwroutine->ReScanForeignScan = hiveReScanForeignScan;
+	fdwroutine->EndForeignScan = hiveEndForeignScan;
+	fdwroutine->ImportForeignSchema = hiveImportForeignSchema;
 	/* Support functions for join push-down */
-	fdwroutine->GetForeignJoinPaths = athenaGetForeignJoinPaths;
+	fdwroutine->GetForeignJoinPaths = hiveGetForeignJoinPaths;
 	pqsignal(SIGINT, SIGINTInterruptHandler);
 
 	PG_RETURN_POINTER(fdwroutine);
@@ -428,12 +428,12 @@ athena_fdw_handler(PG_FUNCTION_ARGS)
 
 /*
  * Validate the generic options given to a FOREIGN DATA WRAPPER, SERVER,
- * USER MAPPING or FOREIGN TABLE that uses athena_fdw.
+ * USER MAPPING or FOREIGN TABLE that uses hive_fdw.
  *
  * Raise an ERROR if the option or its value is considered invalid.
  */
 Datum
-athena_fdw_validator(PG_FUNCTION_ARGS)
+hive_fdw_validator(PG_FUNCTION_ARGS)
 {
 	List	   *options_list = untransformRelOptions(PG_GETARG_DATUM(0));
 	Oid			catalog = PG_GETARG_OID(1);
@@ -452,16 +452,16 @@ athena_fdw_validator(PG_FUNCTION_ARGS)
 	int			svr_port = 0;
 
 	/*
-	 * Check that only options supported by athena_fdw, and allowed for the
+	 * Check that only options supported by hive_fdw, and allowed for the
 	 * current object type, are given.
 	 */
 	foreach(cell, options_list)
 	{
 		DefElem    *def = (DefElem *) lfirst(cell);
 
-		if (!athenaIsValidOption(def->defname, catalog))
+		if (!hiveIsValidOption(def->defname, catalog))
 		{
-			struct athenaFdwOption *opt;
+			struct hiveFdwOption *opt;
 			StringInfoData buf;
 
 			/*
@@ -648,9 +648,9 @@ athena_fdw_validator(PG_FUNCTION_ARGS)
  * context is the Oid of the catalog holding the object the option is for.
  */
 static bool
-athenaIsValidOption(const char *option, Oid context)
+hiveIsValidOption(const char *option, Oid context)
 {
-	struct athenaFdwOption *opt;
+	struct hiveFdwOption *opt;
 
 	for (opt = valid_options; opt->optname; opt++)
 	{
@@ -661,10 +661,10 @@ athenaIsValidOption(const char *option, Oid context)
 }
 
 /*
- * Fetch the options for a athena_fdw foreign table.
+ * Fetch the options for a hive_fdw foreign table.
  */
 static void
-athenaGetTableOptions(Oid foreigntableid, char **table, char **schema)
+hiveGetTableOptions(Oid foreigntableid, char **table, char **schema)
 {
 	ForeignTable *f_table;
 	List	   *options;
@@ -692,10 +692,10 @@ athenaGetTableOptions(Oid foreigntableid, char **table, char **schema)
 }
 
 /*
- * Fetch the options for the athena_fdw foreign server.
+ * Fetch the options for the hive_fdw foreign server.
  */
 static void
-athenaGetServerOptions(Oid serveroid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **host, int *port)
+hiveGetServerOptions(Oid serveroid, int *querytimeout, int *maxheapsize, char **username, char **password, char **query, char **host, int *port)
 {
 	ForeignServer *f_server;
 	UserMapping *f_mapping;
@@ -750,11 +750,11 @@ athenaGetServerOptions(Oid serveroid, int *querytimeout, int *maxheapsize, char 
 
 
 /*
- * athenaExplainForeignScan
+ * hiveExplainForeignScan
  *		Produce extra output for EXPLAIN
  */
 static void
-athenaExplainForeignScan(ForeignScanState *node, ExplainState *es)
+hiveExplainForeignScan(ForeignScanState *node, ExplainState *es)
 {
 	char	   *svr_username = NULL;
 	char	   *svr_password = NULL;
@@ -767,11 +767,11 @@ athenaExplainForeignScan(ForeignScanState *node, ExplainState *es)
 
 	f_table = GetForeignTable(RelationGetRelid(node->ss.ss_currentRelation));
 
-	elog(DEBUG3, ATHENA_FDW_NAME ": explain foreign scan for relation ID %d",
+	elog(DEBUG3, HIVE_FDW_NAME ": explain foreign scan for relation ID %d",
 		 RelationGetRelid(node->ss.ss_currentRelation));
 
 	/* Fetch options  */
-	athenaGetServerOptions(
+	hiveGetServerOptions(
 						   f_table->serverid,
 						   &svr_querytimeout,
 						   &svr_maxheapsize,
@@ -786,11 +786,11 @@ athenaExplainForeignScan(ForeignScanState *node, ExplainState *es)
 }
 
 /*
- * athenaBeginForeignScan
+ * hiveBeginForeignScan
  *		Initiate access to the database
  */
 static void
-athenaBeginForeignScan(ForeignScanState *node, int eflags)
+hiveBeginForeignScan(ForeignScanState *node, int eflags)
 {
 	char	   *svr_username = NULL;
 	char	   *svr_password = NULL;
@@ -799,9 +799,9 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 	char	   *svr_schema = NULL;
 	int			svr_querytimeout = 0;
 	int			svr_maxheapsize = 0;
-	athenaFdwExecutionState *festate;
+	hiveFdwExecutionState *festate;
 	char	   *query;
-	jclass		AthenaJDBCUtilsClass;
+	jclass		HiveJDBCUtilsClass;
 	jstring		initialize_result = NULL;
 	jmethodID	id_initialize;
 	jfieldID	id_numberofcolumns;
@@ -818,7 +818,7 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 	serverid = intVal(list_nth(fsplan->fdw_private, 2));
 	if (fsplan->scan.scanrelid > 0)
 	{
-		elog(DEBUG3, ATHENA_FDW_NAME ": begin foreign scan for relation ID %d",
+		elog(DEBUG3, HIVE_FDW_NAME ": begin foreign scan for relation ID %d",
 			 RelationGetRelid(node->ss.ss_currentRelation));
 
 		/* Fetch options  */
@@ -827,8 +827,8 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 	}
 	else
 		foreigntableid = intVal(list_nth(fsplan->fdw_private, 3));
-	athenaGetTableOptions(foreigntableid, &svr_table, &svr_schema);
-	athenaGetServerOptions(serverid,
+	hiveGetTableOptions(foreigntableid, &svr_table, &svr_schema);
+	hiveGetServerOptions(serverid,
 						   &svr_querytimeout,
 						   &svr_maxheapsize,
 						   &svr_username,
@@ -838,11 +838,11 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 						   &svr_port
 		);
 
-	festate = athenaGetConnection(svr_username, svr_password, svr_host, svr_port, svr_schema);
+	festate = hiveGetConnection(svr_username, svr_password, svr_host, svr_port, svr_schema);
 
 	query = strVal(list_nth(fsplan->fdw_private, 0));
 
-	elog(DEBUG1, "athena_fdw: Starting Query: %s", query);
+	elog(DEBUG1, "hive_fdw: Starting Query: %s", query);
 
 	node->fdw_state = (void *) festate;
 /*	festate->result = NULL; */
@@ -852,19 +852,19 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 	festate->NumberOfRows = 0;
 
 	/* Connect to the server and execute the query */
-	AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-	if (AthenaJDBCUtilsClass == NULL)
+	HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+	if (HiveJDBCUtilsClass == NULL)
 	{
-		elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+		elog(ERROR, "HiveJDBCUtilsClass is NULL");
 	}
 
-	id_initialize = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "Execute_Query", "(Ljava/lang/String;)Ljava/lang/String;");
+	id_initialize = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "Execute_Query", "(Ljava/lang/String;)Ljava/lang/String;");
 	if (id_initialize == NULL)
 	{
 		elog(ERROR, "id_initialize is NULL");
 	}
 
-	id_numberofcolumns = (*env)->GetFieldID(env, AthenaJDBCUtilsClass, "NumberOfColumns", "I");
+	id_numberofcolumns = (*env)->GetFieldID(env, HiveJDBCUtilsClass, "NumberOfColumns", "I");
 	if (id_numberofcolumns == NULL)
 	{
 		elog(ERROR, "id_numberofcolumns is NULL");
@@ -888,22 +888,22 @@ athenaBeginForeignScan(ForeignScanState *node, int eflags)
 }
 
 /*
- * athenaIterateForeignScan
+ * hiveIterateForeignScan
  *		Read next record from the data file and store it into the
  *		ScanTupleSlot as a virtual tuple
  */
 static TupleTableSlot *
-athenaIterateForeignScan(ForeignScanState *node)
+hiveIterateForeignScan(ForeignScanState *node)
 {
 	char	  **values;
 	HeapTuple	tuple;
 	jmethodID	id_returnresultset;
-	jclass		AthenaJDBCUtilsClass;
+	jclass		HiveJDBCUtilsClass;
 	jobjectArray java_rowarray;
 	int			i = 0;
 	int			j = 0;
 	jstring		tempString;
-	athenaFdwExecutionState *festate = (athenaFdwExecutionState *) node->fdw_state;
+	hiveFdwExecutionState *festate = (hiveFdwExecutionState *) node->fdw_state;
 	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
 	jobject		java_call = festate->java_call;
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
@@ -920,13 +920,13 @@ athenaIterateForeignScan(ForeignScanState *node)
 	}
 
 
-	AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-	if (AthenaJDBCUtilsClass == NULL)
+	HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+	if (HiveJDBCUtilsClass == NULL)
 	{
-		elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+		elog(ERROR, "HiveJDBCUtilsClass is NULL");
 	}
 
-	id_returnresultset = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "ReturnResultSet", "()[Ljava/lang/String;");
+	id_returnresultset = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "ReturnResultSet", "()[Ljava/lang/String;");
 	if (id_returnresultset == NULL)
 	{
 		elog(ERROR, "id_returnresultset is NULL");
@@ -971,17 +971,17 @@ athenaIterateForeignScan(ForeignScanState *node)
 }
 
 /*
- * athenaEndForeignScan
+ * hiveEndForeignScan
  *		Finish scanning foreign table and dispose objects used for this scan
  */
 static void
-athenaEndForeignScan(ForeignScanState *node)
+hiveEndForeignScan(ForeignScanState *node)
 {
 	jmethodID	id_close;
-	jclass		AthenaJDBCUtilsClass;
+	jclass		HiveJDBCUtilsClass;
 	jstring		close_result = NULL;
 	char	   *close_result_cstring = NULL;
-	athenaFdwExecutionState *festate = (athenaFdwExecutionState *) node->fdw_state;
+	hiveFdwExecutionState *festate = (hiveFdwExecutionState *) node->fdw_state;
 	jobject		java_call = festate->java_call;
 	ForeignScan *fsplan = (ForeignScan *) node->ss.ps.plan;
 
@@ -989,18 +989,18 @@ athenaEndForeignScan(ForeignScanState *node)
 
 	if (fsplan->scan.scanrelid > 0)
 	{
-		elog(DEBUG3, ATHENA_FDW_NAME ": end foreign scan for relation ID %d",
+		elog(DEBUG3, HIVE_FDW_NAME ": end foreign scan for relation ID %d",
 			 RelationGetRelid(node->ss.ss_currentRelation));
 	}
 
 
-	AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-	if (AthenaJDBCUtilsClass == NULL)
+	HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+	if (HiveJDBCUtilsClass == NULL)
 	{
-		elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+		elog(ERROR, "HiveJDBCUtilsClass is NULL");
 	}
 
-	id_close = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "Close", "()Ljava/lang/String;");
+	id_close = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "Close", "()Ljava/lang/String;");
 	if (id_close == NULL)
 	{
 		elog(ERROR, "id_close is NULL");
@@ -1024,28 +1024,28 @@ athenaEndForeignScan(ForeignScanState *node)
 }
 
 /*
- * athenaReScanForeignScan
+ * hiveReScanForeignScan
  *		Rescan table, possibly with new parameters
  */
 static void
-athenaReScanForeignScan(ForeignScanState *node)
+hiveReScanForeignScan(ForeignScanState *node)
 {
 	SIGINTInterruptCheckProcess();
 }
 
 /*
- * athenaGetForeignPaths
+ * hiveGetForeignPaths
  *		(9.2+) Get the foreign paths
  */
 static void
-athenaGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+hiveGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
 	Cost		startup_cost = 0;
 	Cost		total_cost = 0;
 
 	SIGINTInterruptCheckProcess();
 
-	elog(DEBUG3, ATHENA_FDW_NAME
+	elog(DEBUG3, HIVE_FDW_NAME
 		 ": get foreign paths for relation ID %d", foreigntableid);
 
 	/* Create a ForeignPath node and add it as only possible path */
@@ -1053,11 +1053,11 @@ athenaGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 }
 
 /*
- * athenaGetForeignPlan
+ * hiveGetForeignPlan
  *		(9.2+) Get a foreign scan plan node
  */
 static ForeignScan *
-athenaGetForeignPlan(PlannerInfo *root,
+hiveGetForeignPlan(PlannerInfo *root,
 					 RelOptInfo *baserel,
 					 Oid foreigntableid,
 					 ForeignPath *best_path,
@@ -1087,9 +1087,9 @@ athenaGetForeignPlan(PlannerInfo *root,
 	List	   *fdw_scan_tlist = NIL;
 
 	Index		scan_relid = baserel->relid;
-	athenaFdwRelationInfo *fpinfo = (athenaFdwRelationInfo *) baserel->fdw_private;
+	hiveFdwRelationInfo *fpinfo = (hiveFdwRelationInfo *) baserel->fdw_private;
 
-	elog(DEBUG3, ATHENA_FDW_NAME
+	elog(DEBUG3, HIVE_FDW_NAME
 		 ": get foreign plan for relation ID %d", foreigntableid);
 
 	/*
@@ -1163,12 +1163,12 @@ athenaGetForeignPlan(PlannerInfo *root,
 	deparseSelectStmtForRel(&sql, root, baserel, remote_conds, &retrieved_attrs, &params_list,
 							fpinfo, fdw_scan_tlist);
 
-	elog(DEBUG1, ATHENA_FDW_NAME ": built HiveQL:\n\n%s\n", sql.data);
+	elog(DEBUG1, HIVE_FDW_NAME ": built HiveQL:\n\n%s\n", sql.data);
 
 	/*
-	 * When it is a join relation the foreigntableid passed to athenaGetForeignPlan
+	 * When it is a join relation the foreigntableid passed to hiveGetForeignPlan
 	 * is zero. We cannot obtain the serverid from this relation so we add the serverid
-	 * to the fdw_private here so we can use this in athenaGetForeignPaln. Likewise
+	 * to the fdw_private here so we can use this in hiveGetForeignPaln. Likewise
 	 * we also need to know the schema to use when we obtain the Hive connection
 	 * we add the foreigntableid as well so that we can get the table options
 	 * from this foreigntableid. Since it is assumed that all the relations
@@ -1184,23 +1184,23 @@ athenaGetForeignPlan(PlannerInfo *root,
 }
 
 /*
- * athenaGetForeignRelSize
+ * hiveGetForeignRelSize
  *		(9.2+) Get a foreign scan plan node
  */
 static void
-athenaGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+hiveGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
 {
-	athenaFdwRelationInfo *fpinfo;
+	hiveFdwRelationInfo *fpinfo;
 	ListCell   *lc;
 
 	SIGINTInterruptCheckProcess();
 
-	elog(DEBUG3, ATHENA_FDW_NAME
+	elog(DEBUG3, HIVE_FDW_NAME
 		 ": get foreign rel size for relation ID %d", foreigntableid);
 
 	baserel->rows = 1000;
 
-	fpinfo = (athenaFdwRelationInfo *) palloc0(sizeof(athenaFdwRelationInfo));
+	fpinfo = (hiveFdwRelationInfo *) palloc0(sizeof(hiveFdwRelationInfo));
 	baserel->fdw_private = (void *) fpinfo;
 
 	/* Base foreign tables need to be push down always. */
@@ -1226,7 +1226,7 @@ athenaGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	 * all attrs used in the local_conds.
 	 *
 	 * In cases where there is a small amount of data, and we don't send
-	 * athena a WHERE clause, we should also do a SELECT *. And that happens
+	 * hive a WHERE clause, we should also do a SELECT *. And that happens
 	 * when attrs_used remains NULL for the local execution case below
 	 */
 	fpinfo->attrs_used = NULL;
@@ -1244,14 +1244,14 @@ athenaGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 }
 
 /*
- ** athenaImportForeignSchema
+ ** hiveImportForeignSchema
  ** Generates CREATE FOREIGN TABLE statements for each of the tables
  ** in the source schema and returns the list of these statements
  ** to the caller.
  **/
 
 static List *
-athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
+hiveImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 {
 	ForeignServer *server;
 	List	   *result = NIL;
@@ -1260,7 +1260,7 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 	char	   *svr_query = NULL;
 	int			svr_querytimeout = 0;
 	int			svr_maxheapsize = 0;
-	jclass		AthenaJDBCUtilsClass;
+	jclass		HiveJDBCUtilsClass;
 	jstring		initialize_result = NULL;
 	jmethodID	id_initialize;
 	jfieldID	id_numberofrows;
@@ -1287,7 +1287,7 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 
 	JVMInitialization(serveroid);
 
-	athenaGetServerOptions(
+	hiveGetServerOptions(
 						   serveroid,
 						   &svr_querytimeout,
 						   &svr_maxheapsize,
@@ -1300,22 +1300,22 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 
 	server = GetForeignServer(serveroid);
 
-	athenaGetConnection(svr_username, svr_password, svr_host, svr_port, stmt->remote_schema);
+	hiveGetConnection(svr_username, svr_password, svr_host, svr_port, stmt->remote_schema);
 
-	AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-	if (AthenaJDBCUtilsClass == NULL)
+	HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+	if (HiveJDBCUtilsClass == NULL)
 	{
-		elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+		elog(ERROR, "HiveJDBCUtilsClass is NULL");
 	}
 
-	id_initialize = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "PrepareDDLStmtList", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+	id_initialize = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "PrepareDDLStmtList", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
 
 	if (id_initialize == NULL)
 	{
 		elog(ERROR, "id_initialize is NULL");
 	}
 
-	id_numberofrows = (*env)->GetFieldID(env, AthenaJDBCUtilsClass, "NumberOfRows", "I");
+	id_numberofrows = (*env)->GetFieldID(env, HiveJDBCUtilsClass, "NumberOfRows", "I");
 	if (id_numberofrows == NULL)
 	{
 		elog(ERROR, "id_numberofrows is NULL");
@@ -1334,7 +1334,7 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 
 	NumberOfRows = (*env)->GetIntField(env, java_call, id_numberofrows);
 
-	id_returnresultset = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "ReturnDDLStmtList", "()[Ljava/lang/String;");
+	id_returnresultset = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "ReturnDDLStmtList", "()[Ljava/lang/String;");
 	if (id_returnresultset == NULL)
 	{
 		elog(ERROR, "id_returnresultset is NULL");
@@ -1354,7 +1354,7 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 			appendStringInfo(&buf, "%s", values[i]);
 			result = lappend(result, pstrdup(buf.data));
 
-			elog(DEBUG1, ATHENA_FDW_NAME "DDL: %.*s\n", (int) buf.len, buf.data);
+			elog(DEBUG1, HIVE_FDW_NAME "DDL: %.*s\n", (int) buf.len, buf.data);
 
 		}
 
@@ -1377,15 +1377,15 @@ athenaImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serveroid)
 }
 
 /*
- * athenaGetConnection
+ * hiveGetConnection
  *		Initiate access to the database
  */
-static athenaFdwExecutionState *
-athenaGetConnection(char *svr_username, char *svr_password, char *svr_host, int svr_port, char *svr_schema)
+static hiveFdwExecutionState *
+hiveGetConnection(char *svr_username, char *svr_password, char *svr_host, int svr_port, char *svr_schema)
 {
 	char	   *svr_url = NULL;
-	athenaFdwExecutionState *festate = NULL;
-	jclass		AthenaJDBCUtilsClass;
+	hiveFdwExecutionState *festate = NULL;
+	jclass		HiveJDBCUtilsClass;
 	jclass		JavaString;
 	jstring		StringArray[7];
 	jstring		initialize_result = NULL;
@@ -1402,15 +1402,15 @@ athenaGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 	SIGINTInterruptCheckProcess();
 
 	/* Set the options for JNI */
-	var_CP = getenv("ATHENA_FDW_CLASSPATH");
+	var_CP = getenv("HIVE_FDW_CLASSPATH");
 	if (!var_CP)
 	{
-		elog(ERROR, "Please set the environment variable ATHENA_FDW_CLASSPATH");
+		elog(ERROR, "Please set the environment variable HIVE_FDW_CLASSPATH");
 	}
 	cp_len = strlen(var_CP) + 2;
 	jar_classpath = (char *) palloc(cp_len);
 	snprintf(jar_classpath, (cp_len + 1), "%s", var_CP);
-	elog(DEBUG3, ATHENA_FDW_NAME ": classpath for the dependency jars is %s", jar_classpath);
+	elog(DEBUG3, HIVE_FDW_NAME ": classpath for the dependency jars is %s", jar_classpath);
 
 	portstr = (char *) palloc(sizeof(int));
 	snprintf(portstr, sizeof(int), "%d", svr_port);
@@ -1428,20 +1428,20 @@ athenaGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 		snprintf(svr_url, cp_len, "jdbc:hive2://%s:%d/default", svr_host, svr_port);
 	}
 
-	elog(DEBUG3, ATHENA_FDW_NAME ": connection url is %s", svr_url);
+	elog(DEBUG3, HIVE_FDW_NAME ": connection url is %s", svr_url);
 
 
 	/* Stash away the state info we have already */
-	festate = (athenaFdwExecutionState *) palloc(sizeof(athenaFdwExecutionState));
+	festate = (hiveFdwExecutionState *) palloc(sizeof(hiveFdwExecutionState));
 
 	/* Connect to the server and execute the query */
-	AthenaJDBCUtilsClass = (*env)->FindClass(env, "AthenaJDBCUtils");
-	if (AthenaJDBCUtilsClass == NULL)
+	HiveJDBCUtilsClass = (*env)->FindClass(env, "HiveJDBCUtils");
+	if (HiveJDBCUtilsClass == NULL)
 	{
-		elog(ERROR, "AthenaJDBCUtilsClass is NULL");
+		elog(ERROR, "HiveJDBCUtilsClass is NULL");
 	}
 
-	id_initialize = (*env)->GetMethodID(env, AthenaJDBCUtilsClass, "ConnInitialize", "([Ljava/lang/String;)Ljava/lang/String;");
+	id_initialize = (*env)->GetMethodID(env, HiveJDBCUtilsClass, "ConnInitialize", "([Ljava/lang/String;)Ljava/lang/String;");
 	if (id_initialize == NULL)
 	{
 		elog(ERROR, "id_ConnInitialize is NULL");
@@ -1476,7 +1476,7 @@ athenaGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 		(*env)->SetObjectArrayElement(env, arg_array, counter, StringArray[counter]);
 	}
 
-	java_call = (*env)->AllocObject(env, AthenaJDBCUtilsClass);
+	java_call = (*env)->AllocObject(env, HiveJDBCUtilsClass);
 	if (java_call == NULL)
 	{
 		elog(ERROR, "java_call is NULL");
@@ -1503,24 +1503,24 @@ athenaGetConnection(char *svr_username, char *svr_password, char *svr_host, int 
 }
 
 /*
- * athenaGetForeignJoinPaths
+ * hiveGetForeignJoinPaths
  *		Add possible ForeignPath to joinrel, if join is safe to push down.
  */
 static void
-athenaGetForeignJoinPaths(PlannerInfo *root,
+hiveGetForeignJoinPaths(PlannerInfo *root,
 							RelOptInfo *joinrel,
 							RelOptInfo *outerrel,
 							RelOptInfo *innerrel,
 							JoinType jointype,
 							JoinPathExtraData *extra)
 {
-	athenaFdwRelationInfo *fpinfo;
+	hiveFdwRelationInfo *fpinfo;
 	Cost		startup_cost = 0;
 	Cost		total_cost = 0;
 	Path	   *epq_path;		/* Path to create plan to be executed when
 								 * EvalPlanQual gets triggered. */
 
-	elog(DEBUG3, ATHENA_FDW_NAME
+	elog(DEBUG3, HIVE_FDW_NAME
 		 ": get foreign join paths");
 
 	/*
@@ -1530,13 +1530,13 @@ athenaGetForeignJoinPaths(PlannerInfo *root,
 		return;
 
 	/*
-	 * Create unfinished athenaFdwRelationInfo entry which is used to indicate
+	 * Create unfinished hiveFdwRelationInfo entry which is used to indicate
 	 * that the join relation is already considered, so that we won't waste
 	 * time in judging safety of join pushdown and adding the same paths again
 	 * if found safe. Once we know that this join can be pushed down, we fill
 	 * the entry.
 	 */
-	fpinfo = (athenaFdwRelationInfo *) palloc0(sizeof(athenaFdwRelationInfo));
+	fpinfo = (hiveFdwRelationInfo *) palloc0(sizeof(hiveFdwRelationInfo));
 	fpinfo->pushdown_safe = false;
 	joinrel->fdw_private = fpinfo;
 	/* attrs_used is only for base relations. */
@@ -1569,7 +1569,7 @@ athenaGetForeignJoinPaths(PlannerInfo *root,
 /*
  * Assess whether the join between inner and outer relations can be pushed down
  * to the foreign server. As a side effect, save information we obtain in this
- * function to athenaFdwRelationInfo passed in.
+ * function to hiveFdwRelationInfo passed in.
  *
  * Joins that satisfy conditions below are safe to push down.
  *
@@ -1584,9 +1584,9 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 				RelOptInfo *outerrel, RelOptInfo *innerrel,
 				JoinPathExtraData *extra)
 {
-	athenaFdwRelationInfo *fpinfo;
-	athenaFdwRelationInfo *fpinfo_o;
-	athenaFdwRelationInfo *fpinfo_i;
+	hiveFdwRelationInfo *fpinfo;
+	hiveFdwRelationInfo *fpinfo_o;
+	hiveFdwRelationInfo *fpinfo_i;
 	ListCell   *lc;
 	List	   *joinclauses;
 	List	   *otherclauses;
@@ -1604,9 +1604,9 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	 * If either of the joining relations is marked as unsafe to pushdown, the
 	 * join can not be pushed down.
 	 */
-	fpinfo = (athenaFdwRelationInfo *) joinrel->fdw_private;
-	fpinfo_o = (athenaFdwRelationInfo *) outerrel->fdw_private;
-	fpinfo_i = (athenaFdwRelationInfo *) innerrel->fdw_private;
+	fpinfo = (hiveFdwRelationInfo *) joinrel->fdw_private;
+	fpinfo_o = (hiveFdwRelationInfo *) outerrel->fdw_private;
+	fpinfo_i = (hiveFdwRelationInfo *) innerrel->fdw_private;
 	fpinfo->foreigntableid = fpinfo_o->table->relid;
 	if (!fpinfo_o || !fpinfo_o->pushdown_safe ||
 		!fpinfo_i || !fpinfo_i->pushdown_safe)

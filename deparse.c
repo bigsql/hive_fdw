@@ -1,25 +1,25 @@
-/*------------------------------------------------------------------------/athena/athena
+/*------------------------------------------------------------------------
  *
  * deparse.c
- *                Query deparser for athena_fdw
+ *                Query deparser for hive_fdw
  *
  * This file includes functions that examine query WHERE clauses to see
  * whether they're safe to send to the remote server for execution, as
  * well as functions to construct the query text to be sent.  We only 
  * need deparse logic for node types that we consider safe to send.
  *
- * Copyright (c) 2012-2018, BigSQL
+ * Copyright (c) 2012-2020, BigSQL
  * Portions Copyright (c) 2012, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *                athena_fdw/src/deparse.c
+ *                hive_fdw/src/deparse.c
  *
  *-------------------------------------------------------------------------
  */
 
 #include "postgres.h"
 
-#include "athena_fdw.h"
+#include "hive_fdw.h"
 
 #include "access/heapam.h"
 #include "access/htup_details.h"
@@ -419,14 +419,14 @@ is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr)
 
 	if (contain_mutable_functions((Node *) expr))
 	{
-		elog(DEBUG2, ATHENA_FDW_NAME
+		elog(DEBUG2, HIVE_FDW_NAME
 			 ": pushdown prevented because the results of mutable functions "
 			 "are not stable.");
 		return false;
 	}
 
 
-	elog(DEBUG5, ATHENA_FDW_NAME ": pushdown expression checks passed");
+	elog(DEBUG5, HIVE_FDW_NAME ": pushdown expression checks passed");
 
 	/* OK to evaluate on the remote server */
 	return true;
@@ -523,7 +523,7 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 	Expr	   *arg2;
 	char	   *oprname;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_ScalarArrayOpExpr");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_ScalarArrayOpExpr");
 
 	/* Retrieve information about the operator from system catalog. */
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(node->opno));
@@ -574,7 +574,7 @@ deparseScalarArrayOpExpr(ScalarArrayOpExpr *node, deparse_expr_cxt *context)
 static void
 deparseRelabelType(RelabelType *node, deparse_expr_cxt *context)
 {
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_RelabelType");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_RelabelType");
 
 	deparseExpr(node->arg, context);
 	if (node->relabelformat != COERCE_IMPLICIT_CAST)
@@ -590,7 +590,7 @@ deparseVar(Var *node, deparse_expr_cxt *context)
 	StringInfo	buf = context->buf;
 	bool		qualify_col = (context->foreignrel->reloptkind == RELOPT_JOINREL);
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_Var");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_Var");
 
 	if (bms_is_member(node->varno, context->foreignrel->relids) &&
 		node->varlevelsup == 0)
@@ -651,7 +651,7 @@ deparseConst(Const *node, deparse_expr_cxt *context)
 	ArrayType  *arr;
 	ArrayIterator array_iterator;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_Const");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_Const");
 
 	if (node->constisnull)
 	{
@@ -772,7 +772,7 @@ deparseParam(Param *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_Param");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_Param");
 
 	if (context->params_list)
 	{
@@ -822,7 +822,7 @@ deparseFuncExpr(FuncExpr *node, deparse_expr_cxt *context)
 	bool		first, skip_first_arg = false;
 	ListCell   *arg;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_FuncExpr");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_FuncExpr");
 
 	/*
 	 * If the function call came from an implicit coercion, then just show the
@@ -891,7 +891,7 @@ deparseOpExpr(OpExpr *node, deparse_expr_cxt *context)
 	ListCell   *arg;
 	char	   *oprname;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_OpExpr");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_OpExpr");
 
 	/* Retrieve information about the operator from system catalog. */
 	tuple = SearchSysCache1(OPEROID, ObjectIdGetDatum(node->opno));
@@ -956,7 +956,7 @@ deparseBoolExpr(BoolExpr *node, deparse_expr_cxt *context)
 	bool		first;
 	ListCell   *lc;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_BoolExpr");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_BoolExpr");
 
 	switch (node->boolop)
 	{
@@ -993,7 +993,7 @@ deparseNullTest(NullTest *node, deparse_expr_cxt *context)
 {
 	StringInfo	buf = context->buf;
 
-	elog(DEBUG4, ATHENA_FDW_NAME ": pushdown check for T_NullTest");
+	elog(DEBUG4, HIVE_FDW_NAME ": pushdown check for T_NullTest");
 
 	appendStringInfoChar(buf, '(');
 	deparseExpr(node->arg, context);
@@ -1109,7 +1109,7 @@ void
 deparseFromExprForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *foreignrel,
 					  bool use_alias, List **params_list)
 {
-	athenaFdwRelationInfo *fpinfo = (athenaFdwRelationInfo *) foreignrel->fdw_private;
+	hiveFdwRelationInfo *fpinfo = (hiveFdwRelationInfo *) foreignrel->fdw_private;
 
 	if (foreignrel->reloptkind == RELOPT_JOINREL)
 	{
@@ -1235,7 +1235,7 @@ List *
 build_tlist_to_deparse(RelOptInfo *foreignrel)
 {
 	List	   *tlist = NIL;
-	athenaFdwRelationInfo *fpinfo = (athenaFdwRelationInfo *) foreignrel->fdw_private;
+	hiveFdwRelationInfo *fpinfo = (hiveFdwRelationInfo *) foreignrel->fdw_private;
 
 	/*
 	 * We require columns specified in foreignrel->reltarget->exprs and those
@@ -1286,7 +1286,7 @@ deparseExplicitTargetList(List *tlist, List **retrieved_attrs,
 extern void
 deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
 						List *remote_conds, List **retrieved_attrs, List **params_list,
-						athenaFdwRelationInfo *fpinfo, List *fdw_scan_tlist)
+						hiveFdwRelationInfo *fpinfo, List *fdw_scan_tlist)
 {
 	deparse_expr_cxt context;
 	/* Set up context struct for recursion */
@@ -1299,7 +1299,7 @@ deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
 					 retrieved_attrs, fdw_scan_tlist, &context);
 	appendStringInfo(buf, "%s", " FROM ");
 
-	elog(DEBUG5, ATHENA_FDW_NAME ": built statement: \"%s\"", buf->data);
+	elog(DEBUG5, HIVE_FDW_NAME ": built statement: \"%s\"", buf->data);
 
 	deparseFromExprForRel(buf, root, baserel,
 						  (baserel->reloptkind == RELOPT_JOINREL),
@@ -1307,7 +1307,7 @@ deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
 
 	if (remote_conds)
 	{
-		elog(DEBUG3, ATHENA_FDW_NAME ": remote conditions found for pushdown");
+		elog(DEBUG3, HIVE_FDW_NAME ": remote conditions found for pushdown");
 		appendWhereClause(root, baserel, remote_conds,
 						  true, params_list, &context);
 	}

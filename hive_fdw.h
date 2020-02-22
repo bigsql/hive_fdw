@@ -1,18 +1,18 @@
 /*-------------------------------------------------------------------------
  *
- * athena_fdw.h
- *                Foreign-data wrapper for ATHENA
+ * hive_fdw.h
+ *                Foreign-data wrapper for HIVE
  *
  * Copyright (c) 2012-2018, BigSQL
  * Portions Copyright (c) 2012-2013, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *                athena_fdw/src/athena_fdw.h
+ *                hive_fdw/src/hive_fdw.h
  *
  *-------------------------------------------------------------------------
  */
-#ifndef ATHENA_FDW_H
-#define ATHENA_FDW_H
+#ifndef HIVE_FDW_H
+#define HIVE_FDW_H
 
 #include "commands/defrem.h"
 #include "foreign/foreign.h"
@@ -21,9 +21,9 @@
 #include "optimizer/planmain.h"
 #include "utils/rel.h"
 
-#define ATHENA_FDW_NAME				"athena_fdw"
+#define HIVE_FDW_NAME				"hive_fdw"
 
-typedef struct athenaFdwRelationInfo
+typedef struct hiveFdwRelationInfo
 {
 	/*
 	 * True means that the relation can be pushed down. Always true for simple
@@ -48,7 +48,7 @@ typedef struct athenaFdwRelationInfo
 	JoinType	jointype;
 	List	   *joinclauses;
 	Oid			foreigntableid;
-} athenaFdwRelationInfo;
+} hiveFdwRelationInfo;
 
 extern bool is_foreign_expr(PlannerInfo *root, RelOptInfo *baserel, Expr *expr);
 
@@ -60,5 +60,5 @@ extern List *build_tlist_to_deparse(RelOptInfo *foreign_rel);
 extern void
 deparseSelectStmtForRel(StringInfo buf, PlannerInfo *root, RelOptInfo *baserel,
 						List *remote_conds, List **retrieved_attrs, List **params_list,
-						athenaFdwRelationInfo *fpinfo, List *fdw_scan_tlist);
-#endif   /* ATHENA_FDW_H */
+						hiveFdwRelationInfo *fpinfo, List *fdw_scan_tlist);
+#endif   /* HIVE_FDW_H */

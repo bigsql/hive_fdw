@@ -1,0 +1,13 @@
+##########################################################################
+#
+#                foreign-data wrapper for Hive
+#
+# IDENTIFICATION
+#                 hive_fdw/hive_fdw.control
+# 
+##########################################################################
+
+comment = 'Foreign data wrapper for querying Hive'
+default_version = '3.3'
+module_pathname = '$libdir/hive_fdw'
+relocatable = true

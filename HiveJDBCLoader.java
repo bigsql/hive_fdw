@@ -1,9 +1,9 @@
 /*-------------------------------------------------------------------------
  *
- *		  foreign-data wrapper for ATHENA
+ *		  foreign-data wrapper for HIVE
  *
  * IDENTIFICATION
- *		  athena_fdw/AthenaJDBCLoader.java
+ *		  hive_fdw/HiveJDBCLoader.java
  *
  *-------------------------------------------------------------------------
  */
@@ -13,15 +13,15 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.MalformedURLException;
  
-public class AthenaJDBCLoader extends URLClassLoader
+public class HiveJDBCLoader extends URLClassLoader
 {
 
 /*
- * AthenaJDBCLoader
- *		Constructor of AthenaJDBCLoader class.
+ * HiveJDBCLoader
+ *		Constructor of HiveJDBCLoader class.
  */
 	public 
-	AthenaJDBCLoader(URL[] path)
+	HiveJDBCLoader(URL[] path)
 	{
 		super(path);
 	}

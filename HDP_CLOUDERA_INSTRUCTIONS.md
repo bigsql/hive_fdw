@@ -1,12 +1,11 @@
-Using ATHENA-FDW with a Hadoop Sandbox VM
+Using HIVE-FDW with a Hadoop Sandbox VM
 =========================================
 
 ## Overview ##
 
-This HadoopFDW extension is built for the Linux distribution of [PostgreSQL by BigSQL]
-(http://bigsql.org).  It allows access to Hive from PostgreSQL.
+This extension provides access to Big Data from PostgreSQL.
 
-This document elucidates the steps needed to run it against *CDH 5.5
+This document outlines the steps needed to run it against *CDH 5.5
 Quickstart VM* and *HDP 2.4.0 on Hortonworks Sandbox VM*.
 
 ## Pre-Requisites ##
@@ -21,8 +20,8 @@ For this document, we assume that you have downloaded and installed one of the f
   (from [Hortonworks Sandbox Downloads](http://hortonworks.com/downloads/#sandbox))
 
 We also assume that your Hadoop VM is accessible to the machine running
-PostgreSQL with the name **athena-vm** and that the host running
-PostgreSQL can connect to **athena-vm** on Hive TCP port 10000 as well
+PostgreSQL with the name **hive-vm** and that the host running
+PostgreSQL can connect to **hive-vm** on Hive TCP port 10000 as well
 as SSH TCP port 22.
 
 Last, we assume that the host running PostgreSQL has JDK 8 installed.
@@ -35,7 +34,7 @@ the Hadoop VM.
 Connect to the VM using SSH from the PostgreSQL host:
 
 ```bash
-ssh root@athena-vm
+ssh root@hive-vm
 ```
 ## JAR files for CDH ##
 
@@ -43,32 +42,32 @@ Determine the specific versions of the JAR files by running the `ls`
 commands with the glob patterns shown below:
 
 ```bash
-[hive@sandbox ~]$ ls /usr/lib/athena/athena-common*[0-9].jar
-/usr/lib/athena/athena-common-2.6.0-cdh5.5.0.jar
+[hive@sandbox ~]$ ls /usr/lib/hive/hive-common*[0-9].jar
+/usr/lib/hive/hive-common-2.6.0-cdh5.5.0.jar
 [hive@sandbox ~]$ ls /usr/lib/hive/lib/hive*jdbc*[0-9]*standalone.jar
 /usr/lib/hive/lib/hive-jdbc-1.1.0-cdh5.5.0-standalone.jar
 ```
 
-Please note that the pattern `athena-common*[0-9].jar` precludes the
-file `athena-common*-test.jar` from appearing and that the second
+Please note that the pattern `hive-common*[0-9].jar` precludes the
+file `hive-common*-test.jar` from appearing and that the second
 pattern precludes the symlink `hive-jdbc-standalone.jar` from appearing.
 
 Once you have the paths for the two JAR files, SCP them to a directory
 `hive-client-lib` on the PostgreSQL host that you are installing the
-Hadoop FDW on.
+HiveFDW on.
 
 ## JAR files for HDP ##
 
-Run the command `athena classpath` as the hive user to find the root
-directory containing the athena JAR files (`/usr/hdp/2.4.0.0-169`):
+Run the command `hive classpath` as the hive user to find the root
+directory containing the hive JAR files (`/usr/hdp/2.4.0.0-169`):
 
 ```bash
 [root@sandbox ~]# su - hive
-[hive@sandbox ~]$ athena classpath
-/usr/hdp/2.4.0.0-169/athena/conf:/usr/hdp/2.4.0.0-169/athena/lib/*:/usr/hdp/2.4.0.0-169/athena/.//*:
-/usr/hdp/2.4.0.0-169/athena-hdfs/./:/usr/hdp/2.4.0.0-169/athena-hdfs/lib/*:/usr/hdp/2.4.0.0-169/hado
-op-hdfs/.//*:/usr/hdp/2.4.0.0-169/athena-yarn/lib/*:/usr/hdp/2.4.0.0-169/athena-yarn/.//*:/usr/hdp/2
-.4.0.0-169/athena-mapreduce/lib/*:/usr/hdp/2.4.0.0-169/athena-mapreduce/.//*::mysql-connector-java-5
+[hive@sandbox ~]$ hive classpath
+/usr/hdp/2.4.0.0-169/hive/conf:/usr/hdp/2.4.0.0-169/hive/lib/*:/usr/hdp/2.4.0.0-169/hive/.//*:
+/usr/hdp/2.4.0.0-169/hive-hdfs/./:/usr/hdp/2.4.0.0-169/hive-hdfs/lib/*:/usr/hdp/2.4.0.0-169/hado
+op-hdfs/.//*:/usr/hdp/2.4.0.0-169/hive-yarn/lib/*:/usr/hdp/2.4.0.0-169/hive-yarn/.//*:/usr/hdp/2
+.4.0.0-169/hive-mapreduce/lib/*:/usr/hdp/2.4.0.0-169/hive-mapreduce/.//*::mysql-connector-java-5
 .1.17.jar:mysql-connector-java-5.1.31-bin.jar:mysql-connector-java.jar:/usr/hdp/2.4.0.0-169/tez/*:/u
 sr/hdp/2.4.0.0-169/tez/lib/*:/usr/hdp/2.4.0.0-169/tez/conf
 ```
@@ -78,9 +77,9 @@ The JAR files we need are:
 ```
 /usr/hdp/2.4.0.0-169/
     |
-    `--- athena/
+    `--- hive/
          |
-         `--- athena-common-2.7.1.2.4.0.0-169.jar
+         `--- hive-common-2.7.1.2.4.0.0-169.jar
     |
     `--- hive/
          |
@@ -94,18 +93,18 @@ determine the specific versions of the JAR files by running the `ls`
 commands with the glob patterns shown below:
 
 ```bash
-[hive@sandbox ~]$ ls /usr/hdp/*/athena/athena-common*[0-9].jar
-/usr/hdp/2.4.0.0-169/athena/athena-common-2.7.1.2.4.0.0-169.jar
+[hive@sandbox ~]$ ls /usr/hdp/*/hive/hive-common*[0-9].jar
+/usr/hdp/2.4.0.0-169/hive/hive-common-2.7.1.2.4.0.0-169.jar
 [hive@sandbox ~]$ ls /usr/hdp/*/hive/lib/hive*jdbc*standalone.jar
 /usr/hdp/2.4.0.0-169/hive/lib/hive-jdbc-1.2.1000.2.4.0.0-169-standalone.jar
 ```
 
-Please note that the pattern `athena-common*[0-9].jar` precludes the
-file `athena-common*-test.jar` from appearing.
+Please note that the pattern `hive-common*[0-9].jar` precludes the
+file `hive-common*-test.jar` from appearing.
 
 Once you have the paths for the two JAR files, SCP them to a directory
 `hive-client-lib` on the PostgreSQL host that you are installing the
-Hadoop FDW on.
+HiveFDW on.
 
 ## Test that you are able to connect to Hive ##
 
@@ -121,7 +120,7 @@ import java.sql.Statement;
 
 public class HiveJdbcClient {
 
-    private static final String url      = "jdbc:hive2://athena-vm:10000";
+    private static final String url      = "jdbc:hive2://hive-vm:10000";
     private static final String user     = "";
     private static final String password = "";
     private static final String query    = "SHOW DATABASES";
@@ -159,11 +158,11 @@ javac HiveJdbcClient.java
 ### Linux ###
 
 Assuming that you copied the Hive client JAR files to the directory
-`/opt/athena/hive-client-lib`, run the following command in your
+`/opt/hive/hive-client-lib`, run the following command in your
 shell to execute the program:
 
 ```sh
-java -cp .:$(echo /opt/athena/hive-client-lib/*.jar | tr ' ' :) HiveJdbcClient
+java -cp .:$(echo /opt/hive/hive-client-lib/*.jar | tr ' ' :) HiveJdbcClient
 ```
 
 ### Confirm Output ###
@@ -190,23 +189,20 @@ default
 xademo
 ```
 
-## Install Hadoop-FDW ##
-
-This FDW is included in the [PostgreSQL by BigSQL](http://bigsql.org)
-distribution.  All you have to do is follow the sections below.
+## Install HiveFDW ##
 
 If you are installing from source, please follow the instructions in
 [BUILD.md](BUILD.md).
 
 ## Prepare the Environment ##
 
-The Hadoop FDW needs the following environment variable set for the PostgreSQL
+The HiveFDW needs the following environment variable set for the PostgreSQL
 server:
 
-- **ATHENA_FDW_CLASSPATH**
+- **HIVE_FDW_CLASSPATH**
 
     The `CLASSPATH` referencing all the Hive client JAR files we
-    identified previously and the Hadoop_FDW.jar file which resides
+    identified previously and the hive_fdw.jar file which resides
     in the same directory as that of the PostgreSQL extension
     library files.
 
@@ -217,9 +213,9 @@ We provide examples for these variables below.
 Please stop the PostgreSQL server if it is running and follow the steps
 for the platform matching that of your PostgreSQL server:
 
-We assume that `Hadoop_FDW.jar` resides under the PostgreSQL extension
+We assume that `hive_fdw.jar` resides under the PostgreSQL extension
 library directory `/usr/local/pgsql/lib` and that the Hive client JAR
-files were copied under the directory `/opt/athena/hive-client-lib`.
+files were copied under the directory `/opt/hive/hive-client-lib`.
 
 Assuming the JDK install location `/opt/jdk/x64/jdk1.8.0_40/`, please
 run in a shell:
@@ -232,7 +228,7 @@ Also, in the shell, set up the requisite environment variables. In this
 example, we are using bash:
 
 ```bash
-export ATHENA_FDW_CLASSPATH=/usr/local/pgsql/lib/Hadoop_FDW.jar:$(echo /opt/athena/hive-client-lib/*.jar | tr ' ' :)
+export HIVE_FDW_CLASSPATH=/usr/local/pgsql/lib/hive_fdw.jar:$(echo /opt/hive/hive-client-lib/*.jar | tr ' ' :)
 ```
 
 -Then start the PostgreSQL server from this shell to have the server pick
@@ -246,19 +242,19 @@ we show you how to access it from psql as superuser:
 
 ```sql
 
-CREATE EXTENSION athena_fdw;
+CREATE EXTENSION hive_fdw;
 
-CREATE SERVER athena_server FOREIGN DATA WRAPPER athena_fdw
-  OPTIONS (HOST 'athena-vm', PORT '10000');
+CREATE SERVER hive_server FOREIGN DATA WRAPPER hive_fdw
+  OPTIONS (HOST 'hive-vm', PORT '10000');
 
-CREATE USER MAPPING FOR PUBLIC SERVER athena_server;
+CREATE USER MAPPING FOR PUBLIC SERVER hive_server;
 
 CREATE FOREIGN TABLE sample_07 (
     code                   TEXT,
     description            TEXT,
     total_emp              INT,
     salary                 INT
-) SERVER athena_server OPTIONS (TABLE 'sample_07');
+) SERVER hive_server OPTIONS (TABLE 'sample_07');
 
 ```
 
