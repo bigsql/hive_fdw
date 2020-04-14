@@ -1,4 +1,4 @@
-# ATHENA_AWS_INSTRUCTIONS.md
+# PRESTO_INSTRUCTIONS.md
 ----------------------------
 
 ## Coming Soon!
