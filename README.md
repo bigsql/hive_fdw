@@ -16,7 +16,7 @@ Foreign Data Wrapper (FDW) that facilitates access to Hive Big Data Distributed 
 ## Prepare
 
 In addition to normal PostgreSQL FDW pre-reqs, the primary specific
-requirements for this FDW are a JDK (we test with OPENJDK 8) and a set of
+requirements for this FDW are a JDK (we test with OpenJDK 8 & 11) and a set of
 Hive client JAR files for the Hadoop distribution you are connecting
 with.
 
